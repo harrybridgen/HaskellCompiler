@@ -1,4 +1,6 @@
-import Data.Char (isDigit)
+import Data.Char 
+import Control.Applicative
+import Control.Monad
 
 data Token = IntLiteral Integer  -- Numbers
            | Oper Operator       -- Operators (no arity distinction)
@@ -20,6 +22,7 @@ data BinOperator = Addition | Subtraction | Multiplication | Division
 data UnOperator = Negation
                 deriving (Show)
 
+-- Guard clause scanner
 scan :: String -> [Token]
 scan [] = []
 scan (x:xs)
@@ -35,7 +38,66 @@ scan (x:xs)
                     in IntLiteral (read number) : scan rest
   | otherwise = error "invalid character"
 
-newtype Parser a = P (String -> [(a,String)])
+-- Parser type 
+newtype Parser a = Parser { runParser :: String -> [(a, String)] }
+
+-- Applies a parser to input string
+parse :: Parser a -> String -> [(a, String)]
+parse (Parser pFunct) input = pFunct input
+
+-- Functor instance for Parser to allow for fmap usage
+-- The functor (in this example) 
+-- Takes in a function "fFunct" and a parser "pFunct"
+-- We wrap the output within a parser since fmap returns Parser b
+-- The parser takes an input, applies the parser "pFunct" to it returning (a,String)
+-- We then apply the function "fFunct" to the result of the parser
+instance Functor Parser where
+    fmap fFunct (Parser pFunct) = Parser (\input -> [(fFunct result, rest) | (result, rest) <- pFunct input])
+
+-- Applicative instance for Parser to allow for <*> usage
+-- <*> applies the function parsed by the first parser to the result of the second parser
+instance Applicative Parser where
+    pure v = Parser (\input -> [(v, input)])
+    (Parser pf) <*> (Parser pa) = Parser (\input ->
+        [(f a, rest2) | (f, rest1) <- pf input, (a, rest2) <- pa rest1])
+
+-- Monad instance for Parser to allow for do notation
+-- The result of the first parser is passed to the second parser
+-- The second parser is then run on the remaining input
+-- The results of both parsers are concatenated
+instance Monad Parser where
+    return = pure
+    (Parser pFunct) >>= fFunct = Parser (\input->
+        concat [runParser (fFunct result) rest | (result, rest) <- pFunct input])
+
+-- Alternative instance for Parser to allow for <|> usage
+-- This allows for the parser to try multiple parsers
+instance Alternative Parser where
+    empty = Parser (const [])
+    (Parser pFunct1) <|> (Parser pFunct2) = Parser (\input ->
+        let results = pFunct1 input in if null results then pFunct2 input else results)
+
+-- Define a parser for a natural number (sequence of digits)
+parseInt :: Parser Integer
+parseInt = do
+    digits <- some (satisfy isDigit)
+    return (read digits)
+
+-- Define a parser for an operator
+parseOperator :: Parser Operator
+parseOperator = do
+    operator <- satisfy (`elem` "+-*/")
+    return $ case operator of
+        '+' -> Plus
+        '-' -> Minus
+        '*' -> Times
+        '/' -> Divide
+
+-- Helper function to parse based on a predicate
+satisfy :: (Char -> Bool) -> Parser Char
+satisfy predicate = Parser $ \input -> case input of
+    (x:xs) | predicate x -> [(x, xs)]
+    _                    -> []
 
 parseExpr :: [Token] -> Maybe (AST, [Token])
 parseExpr [] = Nothing

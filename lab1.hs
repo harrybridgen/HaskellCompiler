@@ -44,7 +44,7 @@ data BinOperator = Addition | Subtraction | Multiplication | Division
 data UnOperator = Negation
                 deriving (Show)
 
--- Guard clause scanner
+-- Guard clause scanner OLD/UNUSED
 scan :: String -> [Token]
 scan [] = []
 scan (x:xs)
@@ -105,97 +105,90 @@ instance Alternative Parser where
     (Parser pFunct1) <|> (Parser pFunct2) = Parser (\input ->
         let results = pFunct1 input in if null results then pFunct2 input else results)
 
--- Define a parser for a natural number (sequence of digits)
+-- Grammar
+-- expr  ::= mexpr | mexpr + expr | mexpr - expr
+-- mexpr ::=  term | term * mexpr | term / mexpr
+-- term  ::=   int |    -term     | ( expr )
+
+-- Precendence
+-- Brackets
+-- Unary negation
+-- Division,Multiplication
+-- Subtraction,Addition
+
+-- AST
+-- 1+2*3
+-- BinOp Addition (LitInteger 1) (BinOp Multiplication (LitInteger 2) (LitInteger 3))
+--   +
+--  / \
+-- 1   *
+--    /  \
+--   2    3
+
 parseInt :: Parser Integer
 parseInt = do
     digits <- many (satisfy isDigit)
     return (read digits)
 
--- Define a parser for an operator
-parseBinOp :: Parser BinOperator
-parseBinOp = do
-    operator <- satisfy (`elem` "+-*/")
+parseBinOpDivMul :: Parser BinOperators
+parseBinOpDivMul = do
+    operator <- satisfy (`elem` "*/")
     return $ case operator of
-        '+' -> Addition
-        '-' -> Subtraction
         '*' -> Multiplication
         '/' -> Division
 
-parseExpr2 :: Parser AST 
-parseExpr2 = do
-    int1 <- parseTerm2
-    op <- parseBinOp
-    int2 <- parseTerm2
-    return ( BinOp op (int1) (int2) )
+parseBinOpAddSub :: Parser BinOperator
+parseBinOpAddSub = do
+    operator <- satisfy (`elem` "+-")
+    return $ case operator of
+        '+' -> Addition
+        '-' -> Subtraction
 
-parseTerm2 :: Parser AST
-parseTerm2 = 
+parseExpr :: Parser AST 
+parseExpr = do
+    expr <- parseMExpr2
+    op <- parseBinOpAddSub
+    expr2 <- parseExpr2
+    return ( BinOp op (expr) (expr2) )
+    <|>
+    do
+    expr3 <- parseMExpr2
+    return expr3
+
+parseMExpr :: Parser AST
+parseMExpr = do
+    int1 <- parseTerm2
+    op <- parseBinOpDivMul
+    int2 <- parseMExpr2
+    return ( BinOp op (int1) (int2) )
+    <|>
+    do
+    int3 <- parseTerm2
+    return int3
+
+parseTerm :: Parser AST
+parseTerm = 
     do  satisfy (== '-')
         term <- parseTerm2
         return (UnOp Negation term)
     <|> 
+    do  satisfy (== '(')
+        expr <- parseExpr2
+        satisfy (== ')')
+        return expr
+    <|>
     do  int1 <- parseInt
         return (LitInteger int1)
 
-            
--- Helper function to parse based on a predicate
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser (\input -> case input of
     (x:xs) | predicate x -> [(x, xs)]
     _                    -> [])
 
-monadEval :: String -> Integer
-monadEval input = case parse parseExpr2 input of
+eval :: String -> Integer
+eval input = case parse parseExpr2 input of
     [(ast, "")] -> evaluate ast
     _           -> error "invalid expression"
-
-parseExpr :: [Token] -> Maybe (AST, [Token])
-parseExpr [] = Nothing
-parseExpr xs = case parseMExpr xs of
-  Nothing -> Nothing
-  Just (ast, Oper Plus:rest) -> case parseExpr rest of
-    Just (tree, tokens) -> Just (BinOp Addition ast tree, tokens)
-
-  Just (ast, Oper Minus:rest) -> case parseExpr rest of
-    Just (tree, tokens) -> Just (BinOp Subtraction ast tree, tokens)
-
-  Just (ast, toks) -> Just (ast, toks)
-
-parseMExpr :: [Token] -> Maybe (AST, [Token])
-parseMExpr [] = Nothing
-parseMExpr xs = case parseTerm xs of
-  Nothing -> Nothing
-  Just (ast, Oper Times:rest) -> case parseMExpr rest of
-    Just (tree, tokens) -> Just (BinOp Multiplication ast tree, tokens)
-
-  Just (ast, Oper Divide:rest) -> case parseMExpr rest of
-    Just (tree, tokens) -> Just (BinOp Division ast tree, tokens)
-
-  Just (ast, toks) -> Just (ast, toks)
-
-parseTerm :: [Token] -> Maybe (AST, [Token])
-parseTerm [] = Nothing
-parseTerm (x:xs) = case x of 
-  IntLiteral n -> Just (LitInteger n, xs)
-  Oper Minus -> case parseTerm xs of     
-    Nothing -> Nothing
-    Just (ast, tokens) -> Just (UnOp Negation ast, tokens) 
-  OpenPar -> case parseExpr xs of
-    Just (ast, ClosedPar:rest) -> Just (ast, rest)
-    _ -> Nothing
-
-evaluate :: AST -> Integer
-evaluate (LitInteger n) = n
-evaluate (BinOp Addition a b) = evaluate a + evaluate b
-evaluate (BinOp Subtraction a b) = evaluate a - evaluate b 
-evaluate (BinOp Multiplication a b) = evaluate a * evaluate b 
-evaluate (BinOp Division a b ) = evaluate a `div` evaluate b 
-evaluate (UnOp Negation a) = - evaluate a
-
-eval :: String -> Integer
-eval input = case parseExpr (scan input) of
-  Just (ast, []) -> evaluate ast
-  _ -> error "invalid expression"
 
 type Stack = [Integer]
 

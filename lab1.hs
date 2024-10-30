@@ -121,13 +121,12 @@ parseBinOp = do
         '*' -> Multiplication
         '/' -> Division
 
--- make a parser that combines int and operator
-parseIntOpInt :: Parser AST 
-parseIntOpInt = do
-    int1 <- parseInt
+parseExpr2 :: Parser AST 
+parseExpr2 = do
+    int1 <- parseTerm2
     op <- parseBinOp
-    int2 <- parseInt
-    return ( BinOp op (LitInteger int1) (LitInteger int2) )
+    int2 <- parseTerm2
+    return ( BinOp op (int1) (int2) )
 
 parseTerm2 :: Parser AST
 parseTerm2 = 
@@ -146,7 +145,7 @@ satisfy predicate = Parser (\input -> case input of
     _                    -> [])
 
 monadEval :: String -> Integer
-monadEval input = case parse parseTerm2 input of
+monadEval input = case parse parseExpr2 input of
     [(ast, "")] -> evaluate ast
     _           -> error "invalid expression"
 

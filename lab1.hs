@@ -2,28 +2,6 @@ import Data.Char
 import Control.Applicative
 import Control.Monad
 
--- Grammar
--- expr  ::= mexpr | mexpr + expr | mexpr - expr
--- mexpr ::=  term | term * mexpr | term / mexpr
--- term  ::=   int |    -term     | ( expr )
-
--- Precendence
--- Brackets
--- Unary negation
--- Division
--- Multiplication
--- Subtraction
--- Addition
-
--- AST
--- 1+2*3
--- BinOp Addition (LitInteger 1) (BinOp Multiplication (LitInteger 2) (LitInteger 3))
---   +
---  / \
--- 1   *
---    /  \
---   2    3
-
 data Token = IntLiteral Integer  -- Numbers
            | Oper Operator       -- Operators (no arity distinction)
            | OpenPar             -- Opening Parenthesis
@@ -43,22 +21,6 @@ data BinOperator = Addition | Subtraction | Multiplication | Division
 
 data UnOperator = Negation
                 deriving (Show)
-
--- Guard clause scanner OLD/UNUSED
-scan :: String -> [Token]
-scan [] = []
-scan (x:xs)
-  | x == '+'  = Oper Plus : scan xs
-  | x == '-'  = Oper Minus : scan xs
-  | x == '*'  = Oper Times : scan xs
-  | x == '/'  = Oper Divide : scan xs
-  | x == '('  = OpenPar : scan xs
-  | x == ')'  = ClosedPar : scan xs
-  | x == ' '  = scan xs
-  | isDigit x = let number = takeWhile isDigit (x:xs)
-                    rest = dropWhile isDigit (x:xs)
-                    in IntLiteral (read number) : scan rest
-  | otherwise = error "invalid character"
 
 -- Parser type 
 newtype Parser a = Parser { runParser :: String -> [(a, String)] }
@@ -130,7 +92,7 @@ parseInt = do
     digits <- many (satisfy isDigit)
     return (read digits)
 
-parseBinOpDivMul :: Parser BinOperators
+parseBinOpDivMul :: Parser BinOperator
 parseBinOpDivMul = do
     operator <- satisfy (`elem` "*/")
     return $ case operator of
@@ -146,34 +108,34 @@ parseBinOpAddSub = do
 
 parseExpr :: Parser AST 
 parseExpr = do
-    expr <- parseMExpr2
+    mExpr <- parseMExpr
     op <- parseBinOpAddSub
-    expr2 <- parseExpr2
-    return ( BinOp op (expr) (expr2) )
+    expr <- parseExpr
+    return ( BinOp op (mExpr) (expr) )
     <|>
     do
-    expr3 <- parseMExpr2
+    expr3 <- parseMExpr
     return expr3
 
 parseMExpr :: Parser AST
 parseMExpr = do
-    int1 <- parseTerm2
+    term <- parseTerm
     op <- parseBinOpDivMul
-    int2 <- parseMExpr2
-    return ( BinOp op (int1) (int2) )
+    mExpr <- parseMExpr
+    return ( BinOp op (term) (mExpr) )
     <|>
     do
-    int3 <- parseTerm2
-    return int3
+    term <- parseTerm
+    return term
 
 parseTerm :: Parser AST
 parseTerm = 
     do  satisfy (== '-')
-        term <- parseTerm2
+        term <- parseTerm
         return (UnOp Negation term)
     <|> 
     do  satisfy (== '(')
-        expr <- parseExpr2
+        expr <- parseExpr
         satisfy (== ')')
         return expr
     <|>
@@ -185,8 +147,17 @@ satisfy predicate = Parser (\input -> case input of
     (x:xs) | predicate x -> [(x, xs)]
     _                    -> [])
 
+evaluate :: AST -> Integer
+evaluate (LitInteger n) = n
+evaluate (BinOp Addition a b) = evaluate a + evaluate b
+evaluate (BinOp Subtraction a b) = evaluate a - evaluate b 
+evaluate (BinOp Multiplication a b) = evaluate a * evaluate b 
+evaluate (BinOp Division a b ) = evaluate a `div` evaluate b 
+evaluate (UnOp Negation a) = - evaluate a
+
+
 eval :: String -> Integer
-eval input = case parse parseExpr2 input of
+eval input = case parse parseExpr input of
     [(ast, "")] -> evaluate ast
     _           -> error "invalid expression"
 
@@ -233,6 +204,6 @@ expCode (BinOp Division ast ast') = (expCode ast) ++ (expCode ast') ++ [DIV]
 expCode (UnOp Negation ast) = (expCode ast) ++ [NEG]
 
 compArith :: String -> [TAMInst]
-compArith expression = case parseExpr (scan expression) of
-  Just (tree,[]) -> expCode tree
+compArith expression = case parse parseExpr expression of
+  [(ast,"")] -> expCode ast
   _ -> error "compArith error"

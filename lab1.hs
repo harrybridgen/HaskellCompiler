@@ -131,13 +131,11 @@ parseIntOpInt = do
 
 parseTerm2 :: Parser AST
 parseTerm2 = 
-    do
-        satisfy (== '-')
+    do  satisfy (== '-')
         expr <- parseTerm2
         return (UnOp Negation expr)
     <|> 
-    do
-        int1 <- parseInt
+    do  int1 <- parseInt
         return (LitInteger int1)
 
             

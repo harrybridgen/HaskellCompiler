@@ -2,6 +2,28 @@ import Data.Char
 import Control.Applicative
 import Control.Monad
 
+-- Grammar
+-- expr  ::= mexpr | mexpr + expr | mexpr - expr
+-- mexpr ::=  term | term * mexpr | term / mexpr
+-- term  ::=   int |    -term     | ( expr )
+
+-- Precendence
+-- Brackets
+-- Unary negation
+-- Division
+-- Multiplication
+-- Subtraction
+-- Addition
+
+-- AST
+-- 1+2*3
+-- BinOp Addition (LitInteger 1) (BinOp Multiplication (LitInteger 2) (LitInteger 3))
+--   +
+--  / \
+-- 1   *
+--    /  \
+--   2    3
+
 data Token = IntLiteral Integer  -- Numbers
            | Oper Operator       -- Operators (no arity distinction)
            | OpenPar             -- Opening Parenthesis
@@ -55,11 +77,17 @@ instance Functor Parser where
     fmap fFunct (Parser pFunct) = Parser (\input -> [(fFunct result, rest) | (result, rest) <- pFunct input])
 
 -- Applicative instance for Parser to allow for <*> usage
--- <*> applies the function parsed by the first parser to the result of the second parser
+-- The applicative (in this example)
+-- Takes in two parsers "pFunct1" and "pFunct2"
+-- We then apply the first parser to the input returning (f, rest1)
+-- We then apply the second parser to the remaining input returning (result, rest2)
+-- We then apply the function "f" to the result of the first parser
 instance Applicative Parser where
-    pure v = Parser (\input -> [(v, input)])
-    (Parser pf) <*> (Parser pa) = Parser (\input ->
-        [(f a, rest2) | (f, rest1) <- pf input, (a, rest2) <- pa rest1])
+    pure result = Parser (\input -> [(result, input)])
+    (Parser pFunct1) <*> (Parser pFunct2) = Parser (\input ->
+        [(f result, rest2) | 
+        (f, rest1) <- pFunct1 input, 
+        (result, rest2) <- pFunct2 rest1])
 
 -- Monad instance for Parser to allow for do notation
 -- The result of the first parser is passed to the second parser
@@ -67,8 +95,8 @@ instance Applicative Parser where
 -- The results of both parsers are concatenated
 instance Monad Parser where
     return = pure
-    (Parser pFunct) >>= fFunct = Parser (\input->
-        concat [runParser (fFunct result) rest | (result, rest) <- pFunct input])
+    (Parser pFunct) >>= pFunct2 = Parser (\input->
+        concat [runParser (pFunct2 result) rest | (result, rest) <- pFunct input])
 
 -- Alternative instance for Parser to allow for <|> usage
 -- This allows for the parser to try multiple parsers
@@ -80,24 +108,49 @@ instance Alternative Parser where
 -- Define a parser for a natural number (sequence of digits)
 parseInt :: Parser Integer
 parseInt = do
-    digits <- some (satisfy isDigit)
+    digits <- many (satisfy isDigit)
     return (read digits)
 
 -- Define a parser for an operator
-parseOperator :: Parser Operator
-parseOperator = do
+parseBinOp :: Parser BinOperator
+parseBinOp = do
     operator <- satisfy (`elem` "+-*/")
     return $ case operator of
-        '+' -> Plus
-        '-' -> Minus
-        '*' -> Times
-        '/' -> Divide
+        '+' -> Addition
+        '-' -> Subtraction
+        '*' -> Multiplication
+        '/' -> Division
 
+-- make a parser that combines int and operator
+parseIntOpInt :: Parser AST 
+parseIntOpInt = do
+    int1 <- parseInt
+    op <- parseBinOp
+    int2 <- parseInt
+    return ( BinOp op (LitInteger int1) (LitInteger int2) )
+
+parseTerm2 :: Parser AST
+parseTerm2 = 
+    do
+        satisfy (== '-')
+        expr <- parseTerm2
+        return (UnOp Negation expr)
+    <|> 
+    do
+        int1 <- parseInt
+        return (LitInteger int1)
+
+            
 -- Helper function to parse based on a predicate
 satisfy :: (Char -> Bool) -> Parser Char
-satisfy predicate = Parser $ \input -> case input of
+satisfy predicate = Parser (\input -> case input of
     (x:xs) | predicate x -> [(x, xs)]
-    _                    -> []
+    _                    -> [])
+
+monadEval :: String -> Integer
+monadEval input = case parse parseTerm2 input of
+    [(ast, "")] -> evaluate ast
+    _           -> error "invalid expression"
 
 parseExpr :: [Token] -> Maybe (AST, [Token])
 parseExpr [] = Nothing
@@ -133,7 +186,6 @@ parseTerm (x:xs) = case x of
   OpenPar -> case parseExpr xs of
     Just (ast, ClosedPar:rest) -> Just (ast, rest)
     _ -> Nothing
-
 
 evaluate :: AST -> Integer
 evaluate (LitInteger n) = n
@@ -194,23 +246,3 @@ compArith :: String -> [TAMInst]
 compArith expression = case parseExpr (scan expression) of
   Just (tree,[]) -> expCode tree
   _ -> error "compArith error"
-
-{-
-3 + 2 * (4 - 1)"
--> Scanner ->
-[IntLiteral 3,Oper Plus,IntLiteral 2,Oper Times,OpenPar,IntLiteral 4,Oper Minus,IntLiteral 1,ClosedPar]
--> Parser ->
-(BinOp Addition (LitInteger 3) (BinOp Multiplication (LitInteger 2) (BinOp Subtraction (LitInteger 4) (LitInteger 1)))
-        +
-       / \
-      3   *
-         / \
-        2   -
-           / \
-          4   1 
--> Evaluator ->
-4 - 1 = 3
-2 * 3 = 6
-3 + 6 = 9
--}
-

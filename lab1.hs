@@ -1,25 +1,18 @@
 import Data.Char 
 import Control.Applicative
 import Control.Monad
-
-data Token = IntLiteral Integer  -- Numbers
-           | Oper Operator       -- Operators (no arity distinction)
-           | OpenPar             -- Opening Parenthesis
-           | ClosedPar           -- Closing Parenthesis
-           deriving (Show)       -- Derive Show to allow printing
-
-data Operator = Plus | Minus | Times | Divide
-              deriving (Show)    -- Derive Show to allow printing
+import Data.List
+import Text.Printf
 
 data AST = LitInteger Integer              -- For integer literals
          | BinOp BinOperator AST AST       -- For binary operations
          | UnOp UnOperator AST             -- For unary operations
          deriving (Show)
 
-data BinOperator = Addition | Subtraction | Multiplication | Division
+data BinOperator = Addition | Subtraction | Multiplication | Division | Mod
                  deriving (Show)
 
-data UnOperator = Negation
+data UnOperator = Negation | Absolute
                 deriving (Show)
 
 -- Parser type 
@@ -87,60 +80,83 @@ instance Alternative Parser where
 --    /  \
 --   2    3
 
+parseLeftAssoc :: Parser AST -> Parser BinOperator -> Parser AST
+parseLeftAssoc termParser opParser = do
+    initial <- termParser
+    rest initial
+  where
+    rest left = (do
+        op <- opParser
+        right <- termParser
+        rest (BinOp op left right)) <|> return left
+
+
+parseSpace :: Parser ()
+parseSpace = do
+    _ <- many (satisfy isSpace)
+    return ()
+
+parseToken :: Parser a -> Parser a
+parseToken p = do parseSpace
+                  v <- p
+                  parseSpace
+                  return v
+
 parseInt :: Parser Integer
-parseInt = do
+parseInt = parseToken $ do
     digits <- many (satisfy isDigit)
     return (read digits)
 
-parseBinOpDivMul :: Parser BinOperator
-parseBinOpDivMul = do
-    operator <- satisfy (`elem` "*/")
-    return $ case operator of
-        '*' -> Multiplication
-        '/' -> Division
-
 parseBinOpAddSub :: Parser BinOperator
-parseBinOpAddSub = do
+parseBinOpAddSub = parseToken $ do
     operator <- satisfy (`elem` "+-")
     return $ case operator of
         '+' -> Addition
         '-' -> Subtraction
 
-parseExpr :: Parser AST 
-parseExpr = do
-    mExpr <- parseMExpr
-    op <- parseBinOpAddSub
-    expr <- parseExpr
-    return ( BinOp op (mExpr) (expr) )
-    <|>
-    do
-    expr3 <- parseMExpr
-    return expr3
+parseBinOpDivMul :: Parser BinOperator
+parseBinOpDivMul = parseToken $ do
+    operator <- satisfy (`elem` "*/%")
+    return $ case operator of
+        '*' -> Multiplication
+        '/' -> Division
+        '%' -> Mod
+
+parseExpr :: Parser AST
+parseExpr = parseLeftAssoc parseMExpr parseBinOpAddSub
 
 parseMExpr :: Parser AST
-parseMExpr = do
-    term <- parseTerm
-    op <- parseBinOpDivMul
-    mExpr <- parseMExpr
-    return ( BinOp op (term) (mExpr) )
-    <|>
-    do
-    term <- parseTerm
-    return term
+parseMExpr = parseLeftAssoc parseTerm parseBinOpDivMul
+
 
 parseTerm :: Parser AST
 parseTerm = 
-    do  satisfy (== '-')
+    (parseToken $ do
+        satisfy (== '-')
         term <- parseTerm
-        return (UnOp Negation term)
+        return (UnOp Negation term))
     <|> 
-    do  satisfy (== '(')
+    (parseToken $ do
+        satisfy (== '|')
+        expr <- parseExpr
+        satisfy (== '|')
+        return (UnOp Absolute expr))
+    <|>
+    (parseToken $ do
+        satisfy (== '(')
         expr <- parseExpr
         satisfy (== ')')
-        return expr
+        return expr)
     <|>
-    do  int1 <- parseInt
-        return (LitInteger int1)
+    do
+        int <- parseInt
+        return (LitInteger int)
+
+
+parseArith :: String -> AST
+parseArith input = case parse parseExpr input of
+    [(ast, "")] -> ast
+    _           -> error "invalid expression"
 
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser (\input -> case input of
@@ -152,12 +168,13 @@ evaluate (LitInteger n) = n
 evaluate (BinOp Addition a b) = evaluate a + evaluate b
 evaluate (BinOp Subtraction a b) = evaluate a - evaluate b 
 evaluate (BinOp Multiplication a b) = evaluate a * evaluate b 
-evaluate (BinOp Division a b ) = evaluate a `div` evaluate b 
+evaluate (BinOp Division a b ) = evaluate a `div` evaluate b
+evaluate (BinOp Mod a b) = evaluate a `mod` evaluate b
 evaluate (UnOp Negation a) = - evaluate a
-
+evaluate (UnOp Absolute a) = abs (evaluate a)
 
 eval :: String -> Integer
-eval input = case parse parseExpr input of
+eval input = case parse (parseExpr) input of
     [(ast, "")] -> evaluate ast
     _           -> error "invalid expression"
 
@@ -170,6 +187,8 @@ data TAMInst
   | MUL -- multiplies top values in the stack
   | DIV -- divides the second value by the top
   | NEG -- negates the top of the stack
+  | MOD -- takes the modulus of the second value by the top
+  | ABS -- takes the absolute value of the top of the stack
   deriving (Show)
 
 execute :: Stack -> TAMInst -> Stack
@@ -178,7 +197,9 @@ execute (y:x:rest) ADD = (x + y):rest
 execute (y:x:rest) SUB = (x - y):rest
 execute (y:x:rest) MUL = (x * y):rest
 execute (y:x:rest) DIV = (x `div` y):rest
+execute (y:x:rest) MOD = (x `mod` y):rest
 execute (x:rest) NEG = (-x:rest)
+execute (x:rest) ABS = (abs x:rest)
 
 execTAM :: Stack -> [TAMInst] -> Stack
 execTAM stack [] = stack
@@ -186,22 +207,24 @@ execTAM stack (x:rest) = execTAM (execute stack x) rest
 
 traceTAM :: Stack -> [TAMInst] -> IO Stack
 traceTAM stack instructions = do 
-  putStrLn ("Initial stack: " ++ "\t" ++ show stack)
+  printf "%-10s\t%s\n" ("Initial stack: ") (show stack)
   traceExecTAM stack instructions
 
 traceExecTAM :: Stack -> [TAMInst] -> IO Stack
 traceExecTAM stack (instruction:rest) = do
-  putStrLn ((show instruction) ++ "\t\t" ++ (show (execute stack instruction)))
+  printf "%-10s\t%s\n" (show instruction) (show (execute stack instruction))
   traceExecTAM (execute stack instruction) rest
 traceExecTAM stack [] = return stack
 
 expCode :: AST -> [TAMInst]
 expCode (LitInteger x) = [LOADL x]
-expCode (BinOp Addition ast ast') = (expCode ast) ++ (expCode ast') ++ [ADD]
-expCode (BinOp Subtraction ast ast') = (expCode ast) ++ (expCode ast') ++ [SUB]
-expCode (BinOp Multiplication ast ast') = (expCode ast) ++ (expCode ast') ++ [MUL]
-expCode (BinOp Division ast ast') = (expCode ast) ++ (expCode ast') ++ [DIV]
-expCode (UnOp Negation ast) = (expCode ast) ++ [NEG]
+expCode (BinOp Addition ast ast') = expCode ast ++ expCode ast' ++ [ADD]
+expCode (BinOp Subtraction ast ast') = expCode ast ++ expCode ast' ++ [SUB]
+expCode (BinOp Multiplication ast ast') = expCode ast ++ expCode ast' ++ [MUL]
+expCode (BinOp Division ast ast') = expCode ast ++ expCode ast' ++ [DIV]
+expCode (BinOp Mod ast ast') = expCode ast ++ expCode ast' ++ [MOD]
+expCode (UnOp Negation ast) = expCode ast ++ [NEG]
+expCode (UnOp Absolute ast) = expCode ast ++ [ABS]
 
 compArith :: String -> [TAMInst]
 compArith expression = case parse parseExpr expression of

@@ -1,6 +1,7 @@
 module Parser where
 
 import Control.Applicative
+import Control.Monad
 import Grammar    
 import Data.Char
 import Debug.Trace
@@ -99,7 +100,8 @@ parseUnOpBool = parseToken $ do
     return Not
 
 parseInt :: Parser Integer
-parseInt = parseToken $ do
+parseInt = 
+    parseToken $ do
     digits <- many (satisfy isDigit)
     return (read digits)
 
@@ -173,30 +175,40 @@ parseTerm :: Parser Expr
 parseTerm = 
     parseParentheses 
     <|> parseNegation
+    <|> parseVariable
     <|> parseInteger
 
-parseArith :: String -> Expr
-parseArith input = case parse parseExpr input of
-    [(ast, "")] -> ast
-    _           -> error "invalid expression for parseArith"
+parseVariable :: Parser Expr
+parseVariable = do
+    var <- parseIdentifier
+    return (Var var)
 
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser (\input -> case input of
     (x:xs) | predicate x -> [(x, xs)]
     _                    -> [])
 
+parseArith :: String -> Expr
+parseArith arith = case parse parseExpr arith of
+    [(exprAST, "")] -> exprAST
+    _           -> error "invalid expression"
+
+parseSource :: String -> Program
+parseSource source = case parse parseProgram source of
+    [(programAST, "")] -> programAST
+    _           -> error "invalid source"
+
 parseProgram :: Parser Program
 parseProgram = do
     parseToken $ parseString "let"
-    trace "Parsing declarations" (return ())
     decls <- parseDeclarations
-    trace (show decls) (return ())
     parseToken $ parseString "in"
     command <- parseCommand
     return (LetIn decls command)
 
 parseDeclaration :: Parser Declaration
-parseDeclaration = parseVarAssign <|> parseVarDeclare
+parseDeclaration = do
+    parseVarAssign <|> parseVarDeclare
 
 parseVarDeclare :: Parser Declaration
 parseVarDeclare = do
@@ -215,16 +227,17 @@ parseVarAssign = do
 parseDeclarations :: Parser [Declaration]
 parseDeclarations = do
     decl <- parseDeclaration
-    decls <- many (parseToken $ parseString ";") *> parseDeclarations
+    decls <- many (parseToken $ parseString ";") *> parseDeclarations <|> return []
     return (decl:decls)
 
 parseCommand :: Parser Command
-parseCommand = parseAssignment 
-                <|> parseIfElse
-                <|> parseWhile 
-                <|> parseGetInt 
-                <|> parsePrintInt 
-                <|> parseBeginEnd
+parseCommand = do
+        parseAssignment 
+        <|> parseIfElse
+        <|> parseWhile 
+        <|> parseGetInt 
+        <|> parsePrintInt 
+        <|> parseBeginEnd
 
 parseAssignment :: Parser Command
 parseAssignment = do
@@ -273,11 +286,11 @@ parseBeginEnd = do
 parseCommands :: Parser [Command]
 parseCommands = do
     cmd <- parseCommand
-    cmds <- many (parseToken $ parseString ";") *> parseCommands
+    cmds <- many (parseToken $ parseString ";") *> parseCommands <|> return []
     return (cmd:cmds)
 
-parseIdentifier :: Parser String
+parseIdentifier :: Parser Identifier
 parseIdentifier = do
-    c <- satisfy isAlpha
-    cs <- many (satisfy isAlphaNum)
-    return (c:cs)
+    first <- satisfy isAlpha            
+    rest <- many (satisfy isAlphaNum)    
+    return (Identifier (first : rest))

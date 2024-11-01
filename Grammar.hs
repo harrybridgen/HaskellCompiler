@@ -37,24 +37,27 @@ module Grammar where
 
 data Expr 
     = LitInteger Integer              -- Integer literals
-    | Var String                      -- Variables
+    | Var Identifier                  -- Variables
     | BinOp BinOperator Expr Expr     -- Binary operations (e.g., +, -, *, /)
     | UnOp UnOperator Expr            -- Unary operations (e.g., negation, not)
     | Conditional Expr Expr Expr      -- Conditional operator (b ? x : y)
     deriving (Show)
 
 data Command 
-    = Assignment String Expr          -- Variable assignment
+    = Assignment Identifier Expr          -- Variable assignment
     | If Expr Command Command         -- If-then-else command
     | While Expr Command              -- While loop
-    | GetInt String                   -- Input command for integers
+    | GetInt Identifier                   -- Input command for integers
     | PrintInt Expr                   -- Output command for integers
     | BeginEnd [Command]              -- Block of commands
     deriving (Show)
 
+data Identifier = Identifier String
+    deriving (Show, Eq)
+
 data Declaration 
-    = VarDeclare String               -- Variable declaration (var identifier)
-    | VarAssign String Expr           -- Variable declaration with initialization (var identifier := expr)
+    = VarDeclare Identifier               -- Variable declaration (var identifier)
+    | VarAssign Identifier Expr           -- Variable declaration with initialization (var identifier := expr)
     deriving (Show)
 
 data Program = LetIn [Declaration] Command
@@ -66,6 +69,6 @@ data BinOperator
     | LessThan | GreaterThan | Equal
     | LessThanOrEqual | GreaterThanOrEqual | NotEqual
     deriving (Show)
-    
+
 data UnOperator = Negation | Not
     deriving (Show)

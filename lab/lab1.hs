@@ -67,7 +67,7 @@ instance Alternative Parser where
     (Parser pFunct1) <|> (Parser pFunct2) = Parser (\input ->
         let results = pFunct1 input in if null results then pFunct2 input else results)
 
--- Grammar with AND, OR, NOT
+-- Grammar
 -- expr  ::= mexpr | mexpr + expr | mexpr - expr
 -- mexpr ::=  term | term * mexpr | term / mexpr
 -- term  ::=   int |    -term     | ( expr )
@@ -213,7 +213,7 @@ parseAbsolute = parseToken $ do
 parseNot :: Parser AST
 parseNot = parseToken $ do
     satisfy (== '!')
-    expr <- parseTerm
+    expr <- parseRelationExpr
     return (UnOp Not expr)
 
 parseParentheses :: Parser AST
@@ -228,36 +228,38 @@ parseInteger = do
     int <- parseInt
     return (LitInteger int)
 
-parseCExpr :: Parser AST
-parseCExpr = do
-    b <- parseLExpr
+parseCondExpr :: Parser AST
+parseCondExpr = do
+    b <- parseLogicExpr
     parseToken $ parseString "?"
-    x <- parseLExpr
+    x <- parseLogicExpr
     parseToken $ parseString ":"
-    y <- parseLExpr
+    y <- parseLogicExpr
     return (Cond b x y)
 
 parseExpr :: Parser AST
-parseExpr =   parseCExpr <|> parseLExpr
+parseExpr =   parseCondExpr <|> parseLogicExpr
 
-parseLExpr :: Parser AST
-parseLExpr = parseLeftAssoc parseRExpr parseBinOpBool
+parseLogicExpr :: Parser AST
+parseLogicExpr = parseLeftAssoc parseNotExpr parseBinOpBool
 
-parseRExpr :: Parser AST
-parseRExpr = parseLeftAssoc parseAExpr parseBinOpRel
+parseNotExpr :: Parser AST
+parseNotExpr = (parseNot <|> parseRelationExpr)
 
-parseAExpr :: Parser AST
-parseAExpr = parseLeftAssoc parseMExpr parseBinOpAddSub
+parseRelationExpr :: Parser AST
+parseRelationExpr = parseLeftAssoc parseAddSubExpr parseBinOpRel
 
-parseMExpr :: Parser AST
-parseMExpr = parseLeftAssoc parseTerm parseBinOpDivMul
+parseAddSubExpr :: Parser AST
+parseAddSubExpr = parseLeftAssoc parseMulDivExpr parseBinOpAddSub
+
+parseMulDivExpr :: Parser AST
+parseMulDivExpr = parseLeftAssoc parseTerm parseBinOpDivMul
 
 parseTerm :: Parser AST
 parseTerm = 
-    parseNegation 
-    <|> parseAbsolute 
-    <|> parseNot 
+    parseAbsolute 
     <|> parseParentheses 
+    <|> parseNegation
     <|> parseInteger
 
 
@@ -290,7 +292,6 @@ evaluate (BinOp LessThanOrEqual a b) = if evaluate a <= evaluate b then 1 else 0
 evaluate (BinOp GreaterThanOrEqual a b) = if evaluate a >= evaluate b then 1 else 0
 evaluate (BinOp NotEqual a b) = if evaluate a /= evaluate b then 1 else 0
 evaluate (Cond b x y) = if evaluate b /= 0 then evaluate x else evaluate y
-
 
 eval :: String -> Integer
 eval input = case parse (parseExpr) input of
@@ -375,7 +376,6 @@ expCode (Cond b x y) =
     expCode y ++                     
     [MUL] ++                         
     [ADD]
-
 
 compArith :: String -> [TAMInst]
 compArith expression = case parse parseExpr expression of

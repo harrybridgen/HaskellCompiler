@@ -41,29 +41,46 @@ address a
 
 -}
 
-
-
 module Compiler where
 
+import Control.Applicative
+import Control.Monad
+import Data.Char
+import Data.List
 import Grammar
 import Parser
-import Text.Printf -- !! MUST REMEMBER TO REMOVE THIS !!
+import Text.Printf -- REMOVE THIS LINE
 
 type Stack = [Integer]
 
 data TAMInst
   = LOADL Integer
-  | ADD | SUB | MUL | DIV
-  | NEG | MOD
-  | AND | OR | NOT
-  | LSS | GTR | EQL
-  | HALT | GETINT | PUTINT
-  | LABEL Integer | JUMP Integer | JUMPIFZ Integer
-  | LOAD Integer | STORE Integer
+  | ADD
+  | SUB
+  | MUL
+  | DIV
+  | NEG
+  | MOD
+  | AND
+  | OR
+  | NOT
+  | LSS
+  | GTR
+  | EQL
+  | HALT
+  | GETINT
+  | PUTINT
+  | LABEL Integer
+  | JUMP Integer
+  | JUMPIFZ Integer
+  | LOAD Integer
+  | STORE Integer
   deriving (Read, Show)
 
 execute :: Stack -> TAMInst -> Stack
 execute stack (LOADL x) = x : stack
+execute stack (LOAD n) = getNth (fromIntegral n) stack : stack
+execute (x : rest) (STORE n) = replaceNth (fromIntegral n) x rest
 execute (y : x : rest) ADD = (x + y) : rest
 execute (y : x : rest) SUB = (x - y) : rest
 execute (y : x : rest) MUL = (x * y) : rest
@@ -79,65 +96,78 @@ execute (y : x : rest) EQL = ((if x == y then 1 else 0) : rest)
 
 execTAM :: Stack -> [TAMInst] -> Stack
 execTAM stack [] = stack
-execTAM stack (x:rest) = execTAM (execute stack x) rest
+execTAM stack (x : rest) = execTAM (execute stack x) rest
 
 traceTAM :: Stack -> [TAMInst] -> IO Stack
-traceTAM stack instructions = do 
+traceTAM stack instructions = do
   printf "%-10s\t%s\n" ("Initial stack: ") (show stack)
-  --putStrLn ("Initial stack: " ++ show stack)
+  -- putStrLn ("Initial stack: " ++ show stack)
   traceExecTAM stack instructions
 
 traceExecTAM :: Stack -> [TAMInst] -> IO Stack
-traceExecTAM stack (instruction:rest) = do
+traceExecTAM stack (instruction : rest) = do
   printf "%-10s\t%s\n" (show instruction) (show (execute stack instruction))
-  --putStrLn (show instruction ++ "\t" ++ show (execute stack instruction))
+  -- putStrLn (show instruction ++ "\t" ++ show (execute stack instruction))
   traceExecTAM (execute stack instruction) rest
 traceExecTAM stack [] = return stack
 
-expCode :: Expr -> [TAMInst]
-expCode (LitInteger x) = [LOADL x]
-expCode (BinOp Addition ast ast') = expCode ast ++ expCode ast' ++ [ADD]
-expCode (BinOp Subtraction ast ast') = expCode ast ++ expCode ast' ++ [SUB]
-expCode (BinOp Multiplication ast ast') = expCode ast ++ expCode ast' ++ [MUL]
-expCode (BinOp Division ast ast') = expCode ast ++ expCode ast' ++ [DIV]
-expCode (BinOp Mod ast ast') = expCode ast ++ expCode ast' ++ [MOD]
-expCode (BinOp Conjunction ast ast') = expCode ast ++ expCode ast' ++ [AND]
-expCode (BinOp Disjunction ast ast') = expCode ast ++ expCode ast' ++ [OR]
-expCode (UnOp Negation ast) = expCode ast ++ [NEG]
-expCode (UnOp Not ast) = expCode ast ++ [NOT]
-expCode (BinOp LessThan ast ast') = expCode ast ++ expCode ast' ++ [LSS]
-expCode (BinOp GreaterThan ast ast') = expCode ast ++ expCode ast' ++ [GTR]
-expCode (BinOp Equal ast ast') = expCode ast ++ expCode ast' ++ [EQL]
-expCode (BinOp LessThanOrEqual ast1 ast2) = 
-    expCode ast1 ++ expCode ast2 ++ [LSS] ++
-    expCode ast1 ++ expCode ast2 ++ [EQL] ++
-    [OR]
-expCode (BinOp GreaterThanOrEqual ast1 ast2) = 
-    expCode ast1 ++ expCode ast2 ++ [GTR] ++
-    expCode ast1 ++ expCode ast2 ++ [EQL] ++
-    [OR]
-expCode (BinOp NotEqual ast1 ast2) = 
-    expCode ast1 ++ expCode ast2 ++ [EQL] ++
-    [NOT]
-expCode (Conditional b x y) = 
-    expCode b ++                     
-    expCode x ++                     
-    [MUL] ++                         
-    [LOADL 1] ++ expCode b ++        
-    [SUB] ++                         
-    expCode y ++                     
-    [MUL] ++                         
-    [ADD]
+expCode :: Expr -> VarEnv -> [TAMInst]
+expCode (LitInteger x) _ = [LOADL x]
+expCode (Var var) env = [LOAD (lookupVar var env)]
+expCode (BinOp Addition ast ast') env = expCode ast env ++ expCode ast' env ++ [ADD]
+expCode (BinOp Subtraction ast ast') env = expCode ast env ++ expCode ast' env ++ [SUB]
+expCode (BinOp Multiplication ast ast') env = expCode ast env ++ expCode ast' env ++ [MUL]
+expCode (BinOp Division ast ast') env = expCode ast env ++ expCode ast' env ++ [DIV]
+expCode (BinOp Mod ast ast') env = expCode ast env ++ expCode ast' env ++ [MOD]
+expCode (BinOp Conjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [AND]
+expCode (BinOp Disjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [OR]
+expCode (UnOp Negation ast) env = expCode ast env ++ [NEG]
+expCode (UnOp Not ast) env = expCode ast env ++ [NOT]
+expCode (BinOp LessThan ast ast') env = expCode ast env ++ expCode ast' env ++ [LSS]
+expCode (BinOp GreaterThan ast ast') env = expCode ast env ++ expCode ast' env ++ [GTR]
+expCode (BinOp Equal ast ast') env = expCode ast env ++ expCode ast' env ++ [EQL]
+expCode (BinOp LessThanOrEqual ast1 ast2) env =
+  expCode ast1 env
+    ++ expCode ast2 env
+    ++ [LSS]
+    ++ expCode ast1 env
+    ++ expCode ast2 env
+    ++ [EQL]
+    ++ [OR]
+expCode (BinOp GreaterThanOrEqual ast1 ast2) env =
+  expCode ast1 env
+    ++ expCode ast2 env
+    ++ [GTR]
+    ++ expCode ast1 env
+    ++ expCode ast2 env
+    ++ [EQL]
+    ++ [OR]
+expCode (BinOp NotEqual ast1 ast2) env =
+  expCode ast1 env
+    ++ expCode ast2 env
+    ++ [EQL]
+    ++ [NOT]
+expCode (Conditional b x y) env =
+  expCode b env
+    ++ expCode x env
+    ++ [MUL]
+    ++ [LOADL 1]
+    ++ expCode b env
+    ++ [SUB]
+    ++ expCode y env
+    ++ [MUL]
+    ++ [ADD]
 
 compArith :: String -> [TAMInst]
 compArith expression = case parse parseExpr expression of
-  [(ast,"")] -> expCode ast
+  [(ast, "")] -> expCode ast []
   _ -> error "Compilation error"
 
 stringTraceTAM :: String -> IO Stack
 stringTraceTAM expression = do
   let instructions = compArith expression
   traceTAM [] instructions
+
 -- new tam instructions
 -- • HALT
 -- Stops execution and halts the machine
@@ -153,13 +183,13 @@ stringTraceTAM expression = do
 -- • JUMPIFZ l
 -- Pops the top of the stack, if it is 0, execution control jumps to location
 -- identified by l, if it is not 0 continues with next instruction
--- • LOAD a 
+-- • LOAD a
 -- Reads the content of the stack location with address a and pushes the
 -- value to the top of the stack
 -- • STORE a
 -- Pops the top of the stack and writes the value to the stack location with
 -- address a
-{- 
+{-
 To generate code for a language that contains variables,
 We need to store each variable value to a location (address) in the stack
 For example, if we have three variables x, y, z
@@ -183,3 +213,49 @@ If a variable is not explicitly initialized, we give it the default value 0
 type Address = Integer
 
 type VarEnv = [(Identifier, Address)]
+
+programCode :: Program -> [TAMInst]
+programCode (LetIn declarations command) =
+  let (declareInst, varEnv) = declareVars declarations []
+      commandInst = commandCode command varEnv
+   in declareInst ++ commandInst
+
+declareVars :: [Declaration] -> VarEnv -> ([TAMInst], VarEnv)
+declareVars [] varEnv = ([], varEnv)
+declareVars ((VarDeclare var) : declarations) varEnv =
+  let address = fromIntegral (length varEnv)
+      loadInstr = [LOADL 0]
+      updatedEnv = (var, address) : varEnv
+      (restInstr, finalEnv) = declareVars declarations updatedEnv
+   in (loadInstr ++ restInstr, finalEnv)
+declareVars ((VarAssign var expr) : declarations) varEnv =
+  let address = fromIntegral (length varEnv)
+      exprCode = expCode expr
+      assignInstr = exprCode varEnv
+      updatedEnv = (var, address) : varEnv
+      (restInstr, finalEnv) = declareVars declarations updatedEnv
+   in (assignInstr ++ restInstr, finalEnv)
+
+getNth :: Int -> [a] -> a
+getNth n stack = stack !! (length stack - 1 - n)
+
+replaceNth :: Int -> a -> [a] -> [a]
+replaceNth n newVal stack =
+  let index = length stack - 1 - n
+   in take index stack ++ [newVal] ++ drop (index + 1) stack
+
+commandCode :: Command -> VarEnv -> [TAMInst]
+commandCode (Assignment var expr) env =
+  let addr = lookupVar var env
+      exprCode = expCode expr
+   in exprCode env ++ [STORE addr]
+commandCode (GetInt var) env =
+  let addr = lookupVar var env
+   in [GETINT, STORE addr]
+commandCode (PrintInt expr) env = expCode expr env ++ [PUTINT]
+commandCode (BeginEnd cmds) env = concatMap (`commandCode` env) cmds
+
+lookupVar :: Identifier -> VarEnv -> Address
+lookupVar var env = case lookup var env of
+  Just addr -> addr
+  Nothing -> error ("Variable " ++ show var ++ " not declared.") 2

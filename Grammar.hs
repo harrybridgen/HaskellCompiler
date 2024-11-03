@@ -38,7 +38,7 @@ data Command
   | BeginEnd [Command]
   deriving (Show)
 
-data Identifier = Identifier String
+newtype Identifier = Identifier String
   deriving (Show, Eq, Read)
 
 data Declaration

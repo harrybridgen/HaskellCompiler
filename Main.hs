@@ -34,12 +34,20 @@ runFile sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
-printTAMInstructions :: FilePath -> IO ()
-printTAMInstructions sourceFile = do
+traceRunFile :: FilePath -> IO ()
+traceRunFile sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
+      putStrLn "Executing TAM code"
       let compiledCode = programCode program
-      putStrLn "TAM Instructions:"
-      mapM_ print compiledCode
+      stack <- traceTAM [] compiledCode
+      putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
+
+getInsts :: FilePath -> IO [TAMInst]
+getInsts sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] -> return $ programCode program
+    _ -> error "Syntax error"

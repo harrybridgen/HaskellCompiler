@@ -9,6 +9,6 @@ evaluate (BinOp Addition a b) = evaluate a + evaluate b
 evaluate (BinOp Subtraction a b) = evaluate a - evaluate b
 
 eval :: String -> Integer
-eval input = case parse (parseExpr) input of
+eval input = case parse parseExpr input of
   [(expr, "")] -> evaluate expr
   _ -> error "invalid expression for eval"

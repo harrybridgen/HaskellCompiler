@@ -26,9 +26,9 @@ data TAMInst
   | HALT
   | GETINT
   | PUTINT
-  | LABEL Integer
-  | JUMP Integer
-  | JUMPIFZ Integer
+  | LABEL LabelID
+  | JUMP LabelID
+  | JUMPIFZ LabelID
   | LOAD Integer
   | STORE Integer
   deriving (Read, Show, Eq)
@@ -221,10 +221,9 @@ commandCode (GetInt var) env counter =
   ([GETINT, STORE (lookupVar var env)], counter)
 commandCode (If cond cmd1 cmd2) env counter =
   let condCode = expCode cond env
-      (cmd1Code, counter1) = commandCode cmd1 env counter
+      (cmd1Code, counter1) = commandCode cmd1 env (counter + 1)
       (cmd2Code, counter2) = commandCode cmd2 env (counter1 + 1)
-      thenLabel = counter
-      elseLabel = counter1 + 1
+      elseLabel = counter
       endLabel = counter2 + 1
    in ( condCode
           ++ [JUMPIFZ elseLabel]
@@ -237,7 +236,7 @@ commandCode (If cond cmd1 cmd2) env counter =
       )
 commandCode (While cond cmd) env counter =
   let condCode = expCode cond env
-      (cmdCode, counter1) = commandCode cmd env counter
+      (cmdCode, counter1) = commandCode cmd env (counter + 1)
       whileLabel = counter
       endLabel = counter1 + 1
    in ( [LABEL whileLabel]

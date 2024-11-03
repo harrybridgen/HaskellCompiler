@@ -3,10 +3,10 @@ module Parser where
 import Control.Applicative
 import Control.Monad
 import Data.Char
-import Debug.Trace
+import Debug.Trace -- REMOVE THIS LINE
 import Grammar
 
--- Parser type
+-- Parser data type
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
 -- Applies a parser to input string
@@ -14,20 +14,10 @@ parse :: Parser a -> String -> [(a, String)]
 parse (Parser pFunct) input = pFunct input
 
 -- Functor instance for Parser to allow for fmap usage
--- The functor (in this example)
--- Takes in a function "fFunct" and a parser "pFunct"
--- We wrap the output within a parser since fmap returns Parser b
--- The parser takes an input, applies the parser "pFunct" to it returning (a,String)
--- We then apply the function "fFunct" to the result of the parser
 instance Functor Parser where
   fmap fFunct (Parser pFunct) = Parser (\input -> [(fFunct result, rest) | (result, rest) <- pFunct input])
 
 -- Applicative instance for Parser to allow for <*> usage
--- The applicative (in this example)
--- Takes in two parsers "pFunct1" and "pFunct2"
--- We then apply the first parser to the input returning (f, rest1)
--- We then apply the second parser to the remaining input returning (result, rest2)
--- We then apply the function "f" to the result of the first parser
 instance Applicative Parser where
   pure result = Parser (\input -> [(result, input)])
   (Parser pFunct1) <*> (Parser pFunct2) =
@@ -40,9 +30,6 @@ instance Applicative Parser where
       )
 
 -- Monad instance for Parser to allow for do notation
--- The result of the first parser is passed to the second parser
--- The second parser is then run on the remaining input
--- The results of both parsers are concatenated
 instance Monad Parser where
   return = pure
   (Parser pFunct) >>= pFunct2 =
@@ -52,7 +39,6 @@ instance Monad Parser where
       )
 
 -- Alternative instance for Parser to allow for <|> usage
--- This allows for the parser to try multiple parsers
 instance Alternative Parser where
   empty = Parser (const [])
   (Parser pFunct1) <|> (Parser pFunct2) =
@@ -91,7 +77,7 @@ parseString = traverse (satisfy . (==))
 
 parseBinOpBool :: Parser BinOperator
 parseBinOpBool = parseToken $ do
-  operator <- (parseString "||") <|> (parseString "&&")
+  operator <- parseString "||" <|> parseString "&&"
   return $ case operator of
     "||" -> Disjunction
     "&&" -> Conjunction
@@ -99,12 +85,12 @@ parseBinOpBool = parseToken $ do
 parseBinOpRel :: Parser BinOperator
 parseBinOpRel = parseToken $ do
   operator <-
-    (parseString "<=")
-      <|> (parseString ">=")
-      <|> (parseString "==")
-      <|> (parseString "!=")
-      <|> (parseString "<")
-      <|> (parseString ">")
+    parseString "<="
+      <|> parseString ">="
+      <|> parseString "=="
+      <|> parseString "!="
+      <|> parseString "<"
+      <|> parseString ">"
   return $ case operator of
     "<" -> LessThan
     ">" -> GreaterThan
@@ -179,7 +165,7 @@ parseLogicExpr :: Parser Expr
 parseLogicExpr = parseLeftAssoc parseNotExpr parseBinOpBool
 
 parseNotExpr :: Parser Expr
-parseNotExpr = (parseNot <|> parseRelationExpr)
+parseNotExpr = parseNot <|> parseRelationExpr
 
 parseRelationExpr :: Parser Expr
 parseRelationExpr = parseLeftAssoc parseAddSubExpr parseBinOpRel
@@ -230,7 +216,7 @@ parseProgram = do
 
 parseDeclaration :: Parser Declaration
 parseDeclaration = do
-  parseVarAssign <|> parseVarDeclare
+  parseVarInitialize <|> parseVarDeclare
 
 parseVarDeclare :: Parser Declaration
 parseVarDeclare = do
@@ -238,13 +224,13 @@ parseVarDeclare = do
   var <- parseIdentifier
   return (VarDeclare var)
 
-parseVarAssign :: Parser Declaration
-parseVarAssign = do
+parseVarInitialize :: Parser Declaration
+parseVarInitialize = do
   parseToken $ parseString "var"
   var <- parseIdentifier
   parseToken $ parseString ":="
   expr <- parseExpr
-  return (VarAssign var expr)
+  return (VarInitialize var expr)
 
 parseDeclarations :: Parser [Declaration]
 parseDeclarations = do
@@ -284,19 +270,22 @@ parseWhile = do
   parseToken $ parseString "while"
   cond <- parseExpr
   parseToken $ parseString "do"
-  cmd <- parseCommand
-  return (While cond cmd)
+  While cond <$> parseCommand
 
 parseGetInt :: Parser Command
 parseGetInt = do
   parseToken $ parseString "getint"
+  bracket <- parseToken $ parseString "("
   var <- parseIdentifier
+  bracket <- parseToken $ parseString ")"
   return (GetInt var)
 
 parsePrintInt :: Parser Command
 parsePrintInt = do
   parseToken $ parseString "printint"
+  bracket <- parseToken $ parseString "("
   expr <- parseExpr
+  bracket <- parseToken $ parseString ")"
   return (PrintInt expr)
 
 parseBeginEnd :: Parser Command

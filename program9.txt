@@ -1,0 +1,20 @@
+let var x;
+    var y;
+    var i;
+    var j
+in
+begin
+    getint (x);
+    getint (y);
+    i := 0;
+    while i < x do
+        begin
+            j := 0;
+            while j < y do
+                begin
+                    printint (1);
+                    j := j + 1
+                end;
+            i := i + 1
+        end
+end

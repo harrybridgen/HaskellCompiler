@@ -5,38 +5,41 @@ import Evaluator
 import Grammar
 import Parser
 import System.Environment
-import System.FilePath (replaceExtension, takeExtension)
 import Text.Printf -- !! MUST REMEMBER TO REMOVE THIS !!
 
+-- compile command in terminal:
+-- ghc Main.hs -o Main
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [file, "--trace"] | takeExtension file == ".tam" -> do
-      contents <- readFile file
-      let tamInstructions = read contents :: [TAMInst]
-      finalStack <- traceTAM [] tamInstructions
-      -- putStrLn $ "Final stack: " ++ show finalStack
-      printf "%-10s\t%s\n" ("Final stack: ") (show finalStack)
-    [file, "--run"] | takeExtension file == ".exp" -> do
-      contents <- readFile file
-      let ast = parseArith contents
-          tamInstructions = expCode ast []
-      putStrLn "Running generated TAM code:"
-      print (execTAM [] tamInstructions)
-    [file, "--evaluate"] | takeExtension file == ".exp" -> do
-      contents <- readFile file
-      let ast = parseArith contents
-      print $ "Evaluation result: " ++ show (evaluate ast)
-    [file] -> case takeExtension file of
-      ".exp" -> do
-        contents <- readFile file
-        let ast = parseArith contents
-        let tamFile = replaceExtension file ".tam"
-        writeFile tamFile (show (expCode ast []))
-        putStrLn $ "Compiled to " ++ tamFile
-      ".tam" -> do
-        contents <- readFile file
-        let tamInstructions = expCode (parseArith contents) []
-        print $ "Execution result: " ++ show (execTAM [] tamInstructions)
-    _ -> putStrLn "Usage: program <file> [--trace | --run | --evaluate]"
+    [sourceFile] -> do
+      sourceCode <- readFile sourceFile
+      case parse parseProgram sourceCode of
+        [(program, "")] -> do
+          let compiledCode = programCode program
+          stack <- execTAM [] compiledCode 0
+          print stack
+        _ -> putStrLn "Syntax error"
+    _ -> putStrLn "Usage: ./Main <sourceFile>"
+
+runFile :: FilePath -> IO ()
+runFile sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] -> do
+      putStrLn "Executing TAM code"
+      let compiledCode = programCode program
+      stack <- execTAM [] compiledCode 0
+      putStrLn $ "Final Stack: " ++ show stack
+    _ -> putStrLn "Syntax error"
+
+printTAMInstructions :: FilePath -> IO ()
+printTAMInstructions sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] -> do
+      let compiledCode = programCode program
+      putStrLn "TAM Instructions:"
+      mapM_ print compiledCode
+    _ -> putStrLn "Syntax error"

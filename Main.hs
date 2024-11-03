@@ -45,9 +45,11 @@ traceRunFile sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
-getInsts :: FilePath -> IO [TAMInst]
+getInsts :: FilePath -> IO ()
 getInsts sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
-    [(program, "")] -> return $ programCode program
-    _ -> error "Syntax error"
+    [(program, "")] -> do
+      let compiledCode = programCode program
+      mapM_ print compiledCode
+    _ -> putStrLn "Syntax error"

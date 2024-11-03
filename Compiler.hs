@@ -221,10 +221,10 @@ commandCode (GetInt var) env counter =
   ([GETINT, STORE (lookupVar var env)], counter)
 commandCode (If cond cmd1 cmd2) env counter =
   let condCode = expCode cond env
-      (cmd1Code, counter1) = commandCode cmd1 env (counter + 1)
-      (cmd2Code, counter2) = commandCode cmd2 env (counter1 + 1)
       elseLabel = counter
-      endLabel = counter2 + 1
+      (cmd1Code, counter1) = commandCode cmd1 env (counter + 1)
+      (cmd2Code, counter2) = commandCode cmd2 env counter1
+      endLabel = counter2
    in ( condCode
           ++ [JUMPIFZ elseLabel]
           ++ cmd1Code
@@ -235,15 +235,15 @@ commandCode (If cond cmd1 cmd2) env counter =
         endLabel + 1
       )
 commandCode (While cond cmd) env counter =
-  let condCode = expCode cond env
-      (cmdCode, counter1) = commandCode cmd env (counter + 1)
-      whileLabel = counter
-      endLabel = counter1 + 1
+  let whileLabel = counter
+      endLabel = counter + 1
+      condCode = expCode cond env
+      (cmdCode, counter1) = commandCode cmd env (counter + 2)
    in ( [LABEL whileLabel]
           ++ condCode
           ++ [JUMPIFZ endLabel]
           ++ cmdCode
           ++ [JUMP whileLabel]
           ++ [LABEL endLabel],
-        endLabel + 1
+        counter1
       )

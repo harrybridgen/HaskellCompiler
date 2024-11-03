@@ -1,0 +1,7 @@
+let var x
+in
+begin
+    x := 1;
+    while x == 1 do
+        printint(x)
+end

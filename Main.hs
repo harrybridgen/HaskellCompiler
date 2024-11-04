@@ -1,27 +1,47 @@
 module Main where
 
 import Compiler
+import Control.Applicative
+import Control.Monad
+import Data.Char
+import Data.List
 import Evaluator
 import Grammar
 import Parser
 import System.Environment
-import Text.Printf -- !! MUST REMEMBER TO REMOVE THIS !!
 
 -- compile command in terminal:
--- ghc Main.hs -o Main
+-- ghc Main.hs -o mtc
+-- ./mtc factorial.mt will generate a file factorial.tam containing the compiled TAM program
+-- ./mtc factorial.tam will execute the compiled TAM program
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [sourceFile] -> do
-      sourceCode <- readFile sourceFile
-      case parse parseProgram sourceCode of
-        [(program, "")] -> do
-          let compiledCode = programCode program
-          stack <- execTAM [] compiledCode 0
-          print stack
-        _ -> putStrLn "Syntax error"
+    [sourceFile] ->
+      if ".mt" `isSuffixOf` sourceFile
+        then do
+          sourceCode <- readFile sourceFile
+          case parse parseProgram sourceCode of
+            [(program, "")] -> do
+              let compiledCode = programCode program
+              let tamFile = createNewFileName sourceFile
+              writeFile tamFile (unlines $ map show compiledCode)
+              putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
+            _ -> putStrLn "Syntax error"
+        else
+          if ".tam" `isSuffixOf` sourceFile
+            then do
+              tamCode <- map read . lines <$> readFile sourceFile
+              putStrLn "Executing TAM code"
+              stack <- execTAM [] tamCode 0
+              putStrLn $ "Final stack: " ++ show stack
+            else
+              putStrLn "Unrecognized file extension. Use .mt for source files or .tam for compiled files."
     _ -> putStrLn "Usage: ./Main <sourceFile>"
+
+createNewFileName :: FilePath -> FilePath
+createNewFileName file = takeWhile (/= '.') file ++ ".tam"
 
 runFile :: FilePath -> IO ()
 runFile sourceFile = do

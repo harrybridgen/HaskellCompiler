@@ -304,4 +304,4 @@ parseIdentifier :: Parser Identifier
 parseIdentifier = do
   first <- satisfy isAlpha
   rest <- many (satisfy isAlphaNum)
-  return (Identifier (first : rest))
+  return (first : rest)

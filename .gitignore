@@ -3,7 +3,7 @@
 *.o
 
 # Ignore executable binaries
-Main
+*.exe
 
 # Ignore any other GHC temporary files or directories
 *.dyn_o

@@ -9,11 +9,12 @@ import Evaluator
 import Grammar
 import Parser
 import System.Environment
+import TAM
 
--- compile command in terminal:
+-- Compile in terminal:
 -- ghc Main.hs -o mtc
--- ./mtc factorial.mt will generate a file factorial.tam containing the compiled TAM program
--- ./mtc factorial.tam will execute the compiled TAM program
+-- ./mtc factorial.mt will compile the MiniTriangle (.mt) program to TAM code (.tam)
+-- ./mtc factorial.tam will execute the compiled TAM code
 main :: IO ()
 main = do
   args <- getArgs
@@ -73,3 +74,13 @@ getInsts sourceFile = do
       let compiledCode = programCode program
       mapM_ print compiledCode
     _ -> putStrLn "Syntax error"
+
+stringTraceTAM :: String -> IO Stack
+stringTraceTAM expression = do
+  let instructions = compArith expression
+  traceTAM [] instructions
+
+compArith :: String -> [TAMInst]
+compArith expression = case parse parseExpr expression of
+  [(ast, "")] -> expCode ast []
+  _ -> error "Compilation error"

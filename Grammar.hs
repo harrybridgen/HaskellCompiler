@@ -1,4 +1,4 @@
--- arith grammar
+-- expression grammar
 -- ----------------------------------------------
 -- expr  ::= mexpr | mexpr + expr | mexpr - expr
 -- mexpr ::=  term | term * mexpr | term / mexpr

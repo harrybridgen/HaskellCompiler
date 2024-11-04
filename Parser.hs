@@ -10,7 +10,7 @@ newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
 -- Applies a parser to input string
 parse :: Parser a -> String -> [(a, String)]
-parse (Parser pFunct) input = pFunct input
+parse (Parser pFunct) = pFunct
 
 -- Functor instance for Parser to allow for fmap usage
 instance Functor Parser where
@@ -127,14 +127,12 @@ parseBinOpDivMul = parseToken $ do
 parseNegation :: Parser Expr
 parseNegation = parseToken $ do
   satisfy (== '-')
-  term <- parseTerm
-  return (UnOp Negation term)
+  UnOp Negation <$> parseTerm
 
 parseNot :: Parser Expr
 parseNot = parseToken $ do
   satisfy (== '!')
-  expr <- parseRelationExpr
-  return (UnOp Not expr)
+  UnOp Not <$> parseRelationExpr
 
 parseParentheses :: Parser Expr
 parseParentheses = parseToken $ do
@@ -145,8 +143,7 @@ parseParentheses = parseToken $ do
 
 parseInteger :: Parser Expr
 parseInteger = do
-  int <- parseInt
-  return (LitInteger int)
+  LitInteger <$> parseInt
 
 parseCondExpr :: Parser Expr
 parseCondExpr = do
@@ -154,8 +151,7 @@ parseCondExpr = do
   parseToken $ parseString "?"
   x <- parseLogicExpr
   parseToken $ parseString ":"
-  y <- parseLogicExpr
-  return (Conditional b x y)
+  Conditional b x <$> parseLogicExpr
 
 parseExpr :: Parser Expr
 parseExpr = parseCondExpr <|> parseLogicExpr
@@ -184,8 +180,7 @@ parseTerm =
 
 parseVariable :: Parser Expr
 parseVariable = do
-  var <- parseIdentifier
-  return (Var var)
+  Var <$> parseIdentifier
 
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate =
@@ -210,8 +205,7 @@ parseProgram = do
   parseToken $ parseString "let"
   decls <- parseDeclarations
   parseToken $ parseString "in"
-  command <- parseCommand
-  return (LetIn decls command)
+  LetIn decls <$> parseCommand
 
 parseDeclaration :: Parser Declaration
 parseDeclaration = do
@@ -220,16 +214,14 @@ parseDeclaration = do
 parseVarDeclare :: Parser Declaration
 parseVarDeclare = do
   parseToken $ parseString "var"
-  var <- parseIdentifier
-  return (VarDeclare var)
+  VarDeclare <$> parseIdentifier
 
 parseVarInitialize :: Parser Declaration
 parseVarInitialize = do
   parseToken $ parseString "var"
   var <- parseIdentifier
   parseToken $ parseString ":="
-  expr <- parseExpr
-  return (VarInitialize var expr)
+  VarInitialize var <$> parseExpr
 
 parseDeclarations :: Parser [Declaration]
 parseDeclarations = do
@@ -251,8 +243,7 @@ parseAssignment :: Parser Command
 parseAssignment = do
   var <- parseIdentifier
   parseToken $ parseString ":="
-  expr <- parseExpr
-  return (Assignment var expr)
+  Assignment var <$> parseExpr
 
 parseIfElse :: Parser Command
 parseIfElse = do
@@ -261,8 +252,7 @@ parseIfElse = do
   parseToken $ parseString "then"
   cmd1 <- parseCommand
   parseToken $ parseString "else"
-  cmd2 <- parseCommand
-  return (If cond cmd1 cmd2)
+  If cond cmd1 <$> parseCommand
 
 parseWhile :: Parser Command
 parseWhile = do

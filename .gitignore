@@ -1,0 +1,20 @@
+# Ignore object files and binary files
+*.hi
+*.o
+
+# Ignore executable binaries
+Main
+
+# Ignore any other GHC temporary files or directories
+*.dyn_o
+*.dyn_hi
+*.prof
+*.aux
+*.hp
+*.eventlog
+
+# Ignore any directories named dist or cabal build directories
+dist/
+dist-newstyle/
+cabal-dev/
+.stack-work/

@@ -25,8 +25,8 @@ main = do
           sourceCode <- readFile sourceFile
           case parse parseProgram sourceCode of
             [(program, "")] -> do
-              let compiledCode = programCode program
-              let tamFile = createNewFileName sourceFile
+              let compiledCode = compileProgram program
+              let tamFile = newFile sourceFile
               writeFile tamFile (unlines $ map show compiledCode)
               putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
             _ -> putStrLn "Syntax error"
@@ -38,11 +38,11 @@ main = do
               stack <- execTAM [] tamCode 0
               putStrLn $ "Final stack: " ++ show stack
             else
-              putStrLn "Unrecognized file extension. Use .mt for source files or .tam for compiled files."
-    _ -> putStrLn "Usage: ./Main <sourceFile>"
+              putStrLn "Use .mt for source files or .tam for compiled files"
+    _ -> putStrLn "Usage: ./Main example.mt"
 
-createNewFileName :: FilePath -> FilePath
-createNewFileName file = takeWhile (/= '.') file ++ ".tam"
+newFile :: FilePath -> FilePath
+newFile file = takeWhile (/= '.') file ++ ".tam"
 
 runFile :: FilePath -> IO ()
 runFile sourceFile = do
@@ -50,7 +50,7 @@ runFile sourceFile = do
   case parse parseProgram sourceCode of
     [(program, "")] -> do
       putStrLn "Executing TAM code"
-      let compiledCode = programCode program
+      let compiledCode = compileProgram program
       stack <- execTAM [] compiledCode 0
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
@@ -61,7 +61,7 @@ traceRunFile sourceFile = do
   case parse parseProgram sourceCode of
     [(program, "")] -> do
       putStrLn "Executing TAM code"
-      let compiledCode = programCode program
+      let compiledCode = compileProgram program
       stack <- traceTAM [] compiledCode
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
@@ -71,7 +71,7 @@ getInsts sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
-      let compiledCode = programCode program
+      let compiledCode = compileProgram program
       mapM_ print compiledCode
     _ -> putStrLn "Syntax error"
 

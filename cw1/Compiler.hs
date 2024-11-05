@@ -17,7 +17,6 @@ expCode (BinOp Addition ast ast') env = expCode ast env ++ expCode ast' env ++ [
 expCode (BinOp Subtraction ast ast') env = expCode ast env ++ expCode ast' env ++ [SUB]
 expCode (BinOp Multiplication ast ast') env = expCode ast env ++ expCode ast' env ++ [MUL]
 expCode (BinOp Division ast ast') env = expCode ast env ++ expCode ast' env ++ [DIV]
-expCode (BinOp Mod ast ast') env = expCode ast env ++ expCode ast' env ++ [MOD]
 expCode (BinOp Conjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [AND]
 expCode (BinOp Disjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [OR]
 expCode (UnOp Negation ast) env = expCode ast env ++ [NEG]
@@ -57,8 +56,8 @@ expCode (Conditional b x y) env =
     ++ [MUL]
     ++ [ADD]
 
-programCode :: Program -> [TAMInst]
-programCode (LetIn declarations command) =
+compileProgram :: Program -> [TAMInst]
+compileProgram (LetIn declarations command) =
   let (declareInst, varEnv) = declareVars declarations []
       (commandInst, _) = commandCode command varEnv 0
    in declareInst ++ commandInst ++ [HALT]

@@ -9,7 +9,6 @@ evaluate (BinOp Addition a b) = evaluate a + evaluate b
 evaluate (BinOp Subtraction a b) = evaluate a - evaluate b
 evaluate (BinOp Multiplication a b) = evaluate a * evaluate b
 evaluate (BinOp Division a b) = evaluate a `div` evaluate b
-evaluate (BinOp Mod a b) = evaluate a `mod` evaluate b
 evaluate (UnOp Negation a) = -evaluate a
 evaluate (BinOp Conjunction a b) = if evaluate a /= 0 && evaluate b /= 0 then 1 else 0
 evaluate (BinOp Disjunction a b) = if evaluate a /= 0 || evaluate b /= 0 then 1 else 0

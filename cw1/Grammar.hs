@@ -53,7 +53,6 @@ data BinOperator
   | Subtraction
   | Multiplication
   | Division
-  | Mod
   | Conjunction
   | Disjunction
   | LessThan

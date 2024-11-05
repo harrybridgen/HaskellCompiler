@@ -5,18 +5,14 @@ import Control.Monad
 import Data.Char
 import Grammar
 
--- Parser data type
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
--- Applies a parser to input string
 parse :: Parser a -> String -> [(a, String)]
 parse (Parser pFunct) = pFunct
 
--- Functor instance for Parser to allow for fmap usage
 instance Functor Parser where
   fmap fFunct (Parser pFunct) = Parser (\input -> [(fFunct result, rest) | (result, rest) <- pFunct input])
 
--- Applicative instance for Parser to allow for <*> usage
 instance Applicative Parser where
   pure result = Parser (\input -> [(result, input)])
   (Parser pFunct1) <*> (Parser pFunct2) =
@@ -28,7 +24,6 @@ instance Applicative Parser where
           ]
       )
 
--- Monad instance for Parser to allow for do notation
 instance Monad Parser where
   return = pure
   (Parser pFunct) >>= pFunct2 =
@@ -37,7 +32,6 @@ instance Monad Parser where
           concat [runParser (pFunct2 result) rest | (result, rest) <- pFunct input]
       )
 
--- Alternative instance for Parser to allow for <|> usage
 instance Alternative Parser where
   empty = Parser (const [])
   (Parser pFunct1) <|> (Parser pFunct2) =
@@ -122,7 +116,6 @@ parseBinOpDivMul = parseToken $ do
   return $ case operator of
     '*' -> Multiplication
     '/' -> Division
-    '%' -> Mod
 
 parseNegation :: Parser Expr
 parseNegation = parseToken $ do

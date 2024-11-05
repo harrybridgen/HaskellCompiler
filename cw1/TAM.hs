@@ -35,35 +35,34 @@ type Address = Integer
 
 type Stack = [Integer]
 
-execute :: TAMInst -> Stack -> [TAMInst] -> ProgramCounter -> IO (Stack, ProgramCounter)
-execute (LOADL x) stack _ pc = return (x : stack, pc + 1)
-execute ADD (y : x : rest) _ pc = return ((x + y) : rest, pc + 1)
-execute SUB (y : x : rest) _ pc = return ((x - y) : rest, pc + 1)
-execute MUL (y : x : rest) _ pc = return ((x * y) : rest, pc + 1)
-execute DIV (y : x : rest) _ pc = return ((x `div` y) : rest, pc + 1)
-execute MOD (y : x : rest) _ pc = return ((x `mod` y) : rest, pc + 1)
-execute NEG (x : rest) _ pc = return (-x : rest, pc + 1)
-execute AND (y : x : rest) _ pc = return (logicAnd x y : rest, pc + 1)
-execute OR (y : x : rest) _ pc = return (logicOr x y : rest, pc + 1)
-execute NOT (x : rest) _ pc = return (logicNot x : rest, pc + 1)
-execute LSS (y : x : rest) _ pc = return (comparison (<) x y : rest, pc + 1)
-execute GTR (y : x : rest) _ pc = return (comparison (>) x y : rest, pc + 1)
-execute EQL (y : x : rest) _ pc = return (comparison (==) x y : rest, pc + 1)
-execute (LOAD addr) stack _ pc = return (load addr stack : stack, pc + 1)
-execute (STORE addr) (x : rest) _ pc = return (store addr x rest, pc + 1)
-execute PUTINT (x : rest) _ pc = do
+execute :: Stack -> TAMInst -> [TAMInst] -> ProgramCounter -> IO (Stack, ProgramCounter)
+execute stack (LOADL x) _ pc = return (x : stack, pc + 1)
+execute (y : x : rest) ADD _ pc = return ((x + y) : rest, pc + 1)
+execute (y : x : rest) SUB _ pc = return ((x - y) : rest, pc + 1)
+execute (y : x : rest) MUL _ pc = return ((x * y) : rest, pc + 1)
+execute (y : x : rest) DIV _ pc = return ((x `div` y) : rest, pc + 1)
+execute (x : rest) NEG _ pc = return (-x : rest, pc + 1)
+execute (y : x : rest) AND _ pc = return (logicAnd x y : rest, pc + 1)
+execute (y : x : rest) OR _ pc = return (logicOr x y : rest, pc + 1)
+execute (x : rest) NOT _ pc = return (logicNot x : rest, pc + 1)
+execute (y : x : rest) LSS _ pc = return (comparison (<) x y : rest, pc + 1)
+execute (y : x : rest) GTR _ pc = return (comparison (>) x y : rest, pc + 1)
+execute (y : x : rest) EQL _ pc = return (comparison (==) x y : rest, pc + 1)
+execute stack (LOAD addr) _ pc = return (load addr stack : stack, pc + 1)
+execute (x : rest) (STORE addr) _ pc = return (store addr x rest, pc + 1)
+execute (x : rest) PUTINT _ pc = do
   putStrLn $ "Output > " ++ show x
   return (rest, pc + 1)
-execute GETINT stack _ pc = do
+execute stack GETINT _ pc = do
   x <- getIntFromTerminal
   return (x : stack, pc + 1)
-execute (JUMP labelID) stack instructions _ = return (stack, findLabel labelID instructions)
-execute (JUMPIFZ labelID) (x : stack) instructions pc =
+execute stack (JUMP labelID) instructions _ = return (stack, findLabel labelID instructions)
+execute (x : stack) (JUMPIFZ labelID) instructions pc =
   if x == 0
     then return (stack, findLabel labelID instructions)
     else return (stack, pc + 1)
-execute HALT stack _ _ = return (stack, -1)
-execute (LABEL _) stack _ pc = return (stack, pc + 1)
+execute stack HALT _ _ = return (stack, -1)
+execute stack (LABEL _) _ pc = return (stack, pc + 1)
 
 logicAnd :: Integer -> Integer -> Integer
 logicAnd x y = if x /= 0 && y /= 0 then 1 else 0
@@ -100,7 +99,7 @@ execTAM stack instructions pc
   | pc < 0 || pc >= fromIntegral (length instructions) = return stack
   | otherwise = do
       let inst = instructions !! fromIntegral pc
-      (newStack, newPC) <- execute inst stack instructions pc
+      (newStack, newPC) <- execute stack inst instructions pc
       if newPC == -1
         then return newStack
         else execTAM newStack instructions newPC
@@ -117,7 +116,7 @@ traceExecTAM stack instructions pc
   | otherwise = do
       let inst = instructions !! fromIntegral pc
       do
-        (newStack, newPC) <- execute inst stack instructions pc
+        (newStack, newPC) <- execute stack inst instructions pc
         if newPC == -1
           then return newStack
           else do

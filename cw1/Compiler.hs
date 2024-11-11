@@ -2,13 +2,17 @@ module Compiler where
 
 import Data.Char
 import Data.List
+import Debug.Trace
 import Grammar
 import Parser
+import State
 import TAM
 
 type VarEnv = [(Identifier, Address)]
 
 type LabelCounter = Integer
+
+type CompilerState = (VarEnv, LabelCounter)
 
 expCode :: Expr -> VarEnv -> [TAMInst]
 expCode (LitInteger x) _ = [LOADL x]
@@ -57,70 +61,94 @@ expCode (Conditional b x y) env =
     ++ [ADD]
 
 compileProgram :: Program -> [TAMInst]
-compileProgram (LetIn declarations command) =
-  let (declareInst, varEnv) = declareVars declarations []
-      (commandInst, _) = commandCode command varEnv 0
-   in declareInst ++ commandInst ++ [HALT]
+compileProgram (LetIn declarations command) = evalState compileState ([], 0)
+  where
+    compileState = do
+      declareInst <- declareVars declarations
+      commandInst <- commandCode command
+      return (declareInst ++ commandInst ++ [HALT])
 
-declareVars :: [Declaration] -> VarEnv -> ([TAMInst], VarEnv)
-declareVars [] varEnv = ([], varEnv)
-declareVars ((VarDeclare var) : declarations) varEnv =
-  let address = fromIntegral (length varEnv)
-      loadInstr = [LOADL 0]
-      updatedEnv = (var, address) : varEnv
-      (restInstr, finalEnv) = declareVars declarations updatedEnv
-   in (loadInstr ++ restInstr, finalEnv)
-declareVars ((VarInitialize var expr) : declarations) varEnv =
-  let address = fromIntegral (length varEnv)
-      exprCode = expCode expr
-      initInstr = exprCode varEnv
-      updatedEnv = (var, address) : varEnv
-      (restInstr, finalEnv) = declareVars declarations updatedEnv
-   in (initInstr ++ restInstr, finalEnv)
+declareVar :: Identifier -> State CompilerState [TAMInst]
+declareVar var = do
+  (env, labelCounter) <- get
+  let addr = fromIntegral (length env)
+      newEnv = (var, addr) : env
+  put (newEnv, labelCounter)
+  return [LOADL 0]
+
+initVar :: Identifier -> Expr -> State CompilerState [TAMInst]
+initVar var expr = do
+  (env, labelCounter) <- get
+  let addr = fromIntegral (length env)
+      newEnv = (var, addr) : env
+  put (newEnv, labelCounter)
+  let exprInst = expCode expr env
+  return (exprInst ++ [STORE addr])
+
+declareVars :: [Declaration] -> State CompilerState [TAMInst]
+declareVars [] = return []
+declareVars ((VarDeclare var) : declarations) = do
+  inst <- declareVar var
+  rest <- declareVars declarations
+  return (inst ++ rest)
+declareVars ((VarInitialize var expr) : declarations) = do
+  inst <- initVar var expr
+  rest <- declareVars declarations
+  return (inst ++ rest)
 
 lookupVar :: Identifier -> VarEnv -> Address
 lookupVar var env = case lookup var env of
   Just addr -> addr
   Nothing -> error ("Variable " ++ show var ++ " not declared.")
 
-commandCode :: Command -> VarEnv -> LabelCounter -> ([TAMInst], LabelCounter)
-commandCode (Assignment var expr) env counter =
-  (expCode expr env ++ [STORE (lookupVar var env)], counter)
-commandCode (PrintInt x) env counter =
+commandCode :: Command -> State CompilerState [TAMInst]
+commandCode (Assignment var expr) = do
+  env <- gets fst
+  let exprInst = expCode expr env
+  return (exprInst ++ [STORE (lookupVar var env)])
+commandCode (PrintInt x) = do
+  env <- gets fst
   let exprCode = expCode x env
-   in (exprCode ++ [PUTINT], counter)
-commandCode (BeginEnd []) _ counter = ([], counter)
-commandCode (BeginEnd (cmd : cmds)) env counter =
-  let (inst, newCounter) = commandCode cmd env counter
-      (restInst, finalCounter) = commandCode (BeginEnd cmds) env newCounter
-   in (inst ++ restInst, finalCounter)
-commandCode (GetInt var) env counter =
-  ([GETINT, STORE (lookupVar var env)], counter)
-commandCode (If cond cmd1 cmd2) env counter =
+  return (exprCode ++ [PUTINT])
+commandCode (BeginEnd []) = return []
+commandCode (BeginEnd (cmd : cmds)) = do
+  inst <- commandCode cmd
+  restInst <- commandCode (BeginEnd cmds)
+  return (inst ++ restInst)
+commandCode (GetInt var) = do
+  env <- gets fst
+  return [GETINT, STORE (lookupVar var env)]
+commandCode (If cond cmd1 cmd2) = do
+  env <- gets fst
   let condCode = expCode cond env
-      elseLabel = counter
-      (cmd1Code, counter1) = commandCode cmd1 env (counter + 1)
-      (cmd2Code, counter2) = commandCode cmd2 env counter1
-      endLabel = counter2
-   in ( condCode
-          ++ [JUMPIFZ elseLabel]
-          ++ cmd1Code
-          ++ [JUMP endLabel]
-          ++ [LABEL elseLabel]
-          ++ cmd2Code
-          ++ [LABEL endLabel],
-        endLabel + 1
-      )
-commandCode (While cond cmd) env counter =
-  let whileLabel = counter
-      endLabel = counter + 1
-      condCode = expCode cond env
-      (cmdCode, counter1) = commandCode cmd env (counter + 2)
-   in ( [LABEL whileLabel]
-          ++ condCode
-          ++ [JUMPIFZ endLabel]
-          ++ cmdCode
-          ++ [JUMP whileLabel]
-          ++ [LABEL endLabel],
-        counter1
-      )
+  label1 <- freshLabel
+  label2 <- freshLabel
+  cmd1Code <- commandCode cmd1
+  cmd2Code <- commandCode cmd2
+  return $
+    condCode
+      ++ [JUMPIFZ label1]
+      ++ cmd1Code
+      ++ [JUMP label2]
+      ++ [LABEL label1]
+      ++ cmd2Code
+      ++ [LABEL label2]
+commandCode (While cond cmd) = do
+  env <- gets fst
+  label1 <- freshLabel
+  label2 <- freshLabel
+  let condCode = expCode cond env
+  cmdCode <- commandCode cmd
+  return $
+    [LABEL label1]
+      ++ condCode
+      ++ [JUMPIFZ label2]
+      ++ cmdCode
+      ++ [JUMP label1]
+      ++ [LABEL label2]
+
+freshLabel :: State CompilerState LabelID
+freshLabel = do
+  (env, labelCounter) <- get
+  put (env, labelCounter + 1)
+  return labelCounter

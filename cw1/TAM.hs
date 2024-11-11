@@ -2,6 +2,7 @@ module TAM where
 
 import Data.Char
 import Data.List
+import StateIO
 
 data TAMInst
   = LOADL Integer
@@ -27,42 +28,120 @@ data TAMInst
   | STORE Address
   deriving (Read, Show, Eq)
 
-type ProgramCounter = Integer
-
 type LabelID = Integer
 
 type Address = Integer
 
 type Stack = [Integer]
 
-execute :: Stack -> TAMInst -> [TAMInst] -> ProgramCounter -> IO (Stack, ProgramCounter)
-execute stack (LOADL x) _ pc = return (x : stack, pc + 1)
-execute (y : x : rest) ADD _ pc = return ((x + y) : rest, pc + 1)
-execute (y : x : rest) SUB _ pc = return ((x - y) : rest, pc + 1)
-execute (y : x : rest) MUL _ pc = return ((x * y) : rest, pc + 1)
-execute (y : x : rest) DIV _ pc = return ((x `div` y) : rest, pc + 1)
-execute (x : rest) NEG _ pc = return (-x : rest, pc + 1)
-execute (y : x : rest) AND _ pc = return (logicAnd x y : rest, pc + 1)
-execute (y : x : rest) OR _ pc = return (logicOr x y : rest, pc + 1)
-execute (x : rest) NOT _ pc = return (logicNot x : rest, pc + 1)
-execute (y : x : rest) LSS _ pc = return (comparison (<) x y : rest, pc + 1)
-execute (y : x : rest) GTR _ pc = return (comparison (>) x y : rest, pc + 1)
-execute (y : x : rest) EQL _ pc = return (comparison (==) x y : rest, pc + 1)
-execute stack (LOAD addr) _ pc = return (load addr stack : stack, pc + 1)
-execute (x : rest) (STORE addr) _ pc = return (store addr x rest, pc + 1)
-execute (x : rest) PUTINT _ pc = do
-  putStrLn $ "Output > " ++ show x
-  return (rest, pc + 1)
-execute stack GETINT _ pc = do
-  x <- getIntFromTerminal
-  return (x : stack, pc + 1)
-execute stack (JUMP labelID) instructions _ = return (stack, findLabel labelID instructions)
-execute (x : stack) (JUMPIFZ labelID) instructions pc =
-  if x == 0
-    then return (stack, findLabel labelID instructions)
-    else return (stack, pc + 1)
-execute stack HALT _ _ = return (stack, -1)
-execute stack (LABEL _) _ pc = return (stack, pc + 1)
+data TAMState = TAMState
+  { tsCode :: [TAMInst],
+    tsCounter :: Int,
+    tsStack :: Stack
+  }
+
+tsPush :: Integer -> TAMState -> TAMState
+tsPush x ts = ts {tsStack = x : tsStack ts}
+
+tsPop :: TAMState -> (Integer, TAMState)
+tsPop ts = let (x : xs) = tsStack ts in (x, ts {tsStack = xs})
+
+tsSetCounter :: Int -> TAMState -> TAMState
+tsSetCounter i ts = ts {tsCounter = i}
+
+tsInstruction :: TAMState -> TAMInst
+tsInstruction ts = tsCode ts !! tsCounter ts
+
+tsIncrementCounter :: TAMState -> TAMState
+tsIncrementCounter ts = ts {tsCounter = tsCounter ts + 1}
+
+execute :: TAMInst -> StateIO TAMState ()
+execute inst = do
+  ts <- get
+  case inst of
+    LOADL x -> do
+      put $ tsPush x ts
+      modify tsIncrementCounter
+    ADD -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (x + y) ts''
+      modify tsIncrementCounter
+    SUB -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (x - y) ts''
+      modify tsIncrementCounter
+    MUL -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (x * y) ts''
+      modify tsIncrementCounter
+    DIV -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (x `div` y) ts''
+      modify tsIncrementCounter
+    NEG -> do
+      let (x, ts') = tsPop ts
+      put $ tsPush (-x) ts'
+      modify tsIncrementCounter
+    AND -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (logicAnd x y) ts''
+      modify tsIncrementCounter
+    OR -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (logicOr x y) ts''
+      modify tsIncrementCounter
+    NOT -> do
+      let (x, ts') = tsPop ts
+      put $ tsPush (logicNot x) ts'
+      modify tsIncrementCounter
+    LSS -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (comparison (<) x y) ts''
+      modify tsIncrementCounter
+    GTR -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (comparison (>) x y) ts''
+      modify tsIncrementCounter
+    EQL -> do
+      let (y, ts') = tsPop ts
+      let (x, ts'') = tsPop ts'
+      put $ tsPush (comparison (==) x y) ts''
+      modify tsIncrementCounter
+    LOAD addr -> do
+      put $ tsPush (load addr (tsStack ts)) ts
+      modify tsIncrementCounter
+    STORE addr -> do
+      let (x, ts') = tsPop ts
+      put $ store addr x ts'
+      modify tsIncrementCounter
+    PUTINT -> do
+      let (x, ts') = tsPop ts
+      lift $ putStrLn $ "Output > " ++ show x
+      put ts'
+      modify tsIncrementCounter
+    GETINT -> do
+      x <- lift getIntFromTerminal
+      modify $ tsPush x
+      modify tsIncrementCounter
+    JUMP labelID -> do
+      put $ ts {tsCounter = findLabel labelID (tsCode ts)}
+    JUMPIFZ labelID -> do
+      let (x, ts') = tsPop ts
+      if x == 0
+        then put $ ts' {tsCounter = findLabel labelID (tsCode ts')}
+        else put ts'
+      modify tsIncrementCounter
+    HALT -> do
+      put $ ts {tsCounter = -1}
+    LABEL _ -> modify tsIncrementCounter
 
 logicAnd :: Integer -> Integer -> Integer
 logicAnd x y = if x /= 0 && y /= 0 then 1 else 0
@@ -76,9 +155,9 @@ logicNot x = if x == 0 then 1 else 0
 comparison :: (Integer -> Integer -> Bool) -> Integer -> Integer -> Integer
 comparison op x y = if op x y then 1 else 0
 
-findLabel :: LabelID -> [TAMInst] -> ProgramCounter
+findLabel :: LabelID -> [TAMInst] -> Int
 findLabel labelID instructions = case elemIndex (LABEL labelID) instructions of
-  Just index -> fromIntegral index
+  Just index -> index
   Nothing -> error ("Label " ++ show labelID ++ " not found.")
 
 getIntFromTerminal :: IO Integer
@@ -89,39 +168,43 @@ getIntFromTerminal = do
 load :: Address -> Stack -> Integer
 load addr stack = stack !! (length stack - 1 - fromIntegral addr)
 
-store :: Address -> Integer -> Stack -> Stack
-store addr newVal stack =
-  let index = length stack - 1 - fromIntegral addr
-   in take index stack ++ [newVal] ++ drop (index + 1) stack
+store :: Address -> Integer -> TAMState -> TAMState
+store addr newVal ts =
+  let stack = tsStack ts
+      index = length stack - 1 - fromIntegral addr
+      newStack = take index stack ++ [newVal] ++ drop (index + 1) stack
+   in ts {tsStack = newStack}
 
-execTAM :: Stack -> [TAMInst] -> ProgramCounter -> IO Stack
-execTAM stack instructions pc
-  | pc < 0 || pc >= fromIntegral (length instructions) = return stack
-  | otherwise = do
-      let inst = instructions !! fromIntegral pc
-      (newStack, newPC) <- execute stack inst instructions pc
-      if newPC == -1
-        then return newStack
-        else execTAM newStack instructions newPC
+execTAM :: [TAMInst] -> IO Stack
+execTAM instructions = do
+  let initialState = TAMState {tsCode = instructions, tsCounter = 0, tsStack = []}
+  (_, finalState) <- runStateIO runProgram initialState
+  return $ tsStack finalState
 
-traceTAM :: Stack -> [TAMInst] -> IO Stack
-traceTAM stack instructions = do
-  putStrLn ("Initial stack: " ++ "\t\t" ++ show stack)
-  traceExecTAM stack instructions 0
+runProgram :: StateIO TAMState ()
+runProgram = do
+  ts <- get
+  if tsCounter ts < 0 || tsCounter ts >= length (tsCode ts)
+    then return ()
+    else do
+      let inst = tsInstruction ts
+      execute inst
+      runProgram
 
-traceExecTAM :: Stack -> [TAMInst] -> ProgramCounter -> IO Stack
-traceExecTAM stack instructions pc
-  | pc < 0 || pc >= fromIntegral (length instructions) = do
-      return stack
-  | otherwise = do
-      let inst = instructions !! fromIntegral pc
-      do
-        (newStack, newPC) <- execute stack inst instructions pc
-        if newPC == -1
-          then return newStack
-          else do
-            if inst == PUTINT
-              then traceExecTAM newStack instructions newPC
-              else do
-                putStrLn $ show inst ++ "\t\t" ++ show newStack
-                traceExecTAM newStack instructions newPC
+traceTAM :: [TAMInst] -> IO Stack
+traceTAM instructions = do
+  let initialState = TAMState {tsCode = instructions, tsCounter = 0, tsStack = []}
+  (_, finalState) <- runStateIO traceProgram initialState
+  return $ tsStack finalState
+
+traceProgram :: StateIO TAMState ()
+traceProgram = do
+  ts <- get
+  if tsCounter ts < 0 || tsCounter ts >= length (tsCode ts)
+    then return ()
+    else do
+      let inst = tsInstruction ts
+      execute inst
+      ts' <- get
+      lift $ putStrLn $ show inst ++ "\t\t" ++ show (tsStack ts')
+      traceProgram

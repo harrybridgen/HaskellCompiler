@@ -94,7 +94,7 @@ parseBinOpRel = parseToken $ do
 
 parseUnOpBool :: Parser UnOperator
 parseUnOpBool = parseToken $ do
-  satisfy (== '!')
+  parseToken $ parseString "!"
   return Not
 
 parseInt :: Parser Integer
@@ -119,19 +119,19 @@ parseBinOpDivMul = parseToken $ do
 
 parseNegation :: Parser Expr
 parseNegation = parseToken $ do
-  satisfy (== '-')
+  parseToken $ parseString "-"
   UnOp Negation <$> parseTerm
 
 parseNot :: Parser Expr
 parseNot = parseToken $ do
-  satisfy (== '!')
+  parseToken $ parseString "!"
   UnOp Not <$> parseRelationExpr
 
 parseParentheses :: Parser Expr
 parseParentheses = parseToken $ do
-  satisfy (== '(')
+  parseToken $ parseString "("
   expr <- parseExpr
-  satisfy (== ')')
+  parseToken $ parseString ")"
   return expr
 
 parseInteger :: Parser Expr
@@ -196,9 +196,10 @@ parseSource source = case parse parseProgram source of
 parseProgram :: Parser Program
 parseProgram = do
   parseToken $ parseString "let"
-  decls <- parseDeclarations
+  decls <- parseDeclarations <|> pure []
   parseToken $ parseString "in"
-  LetIn decls <$> parseCommand
+  command <- parseCommand <|> return (BeginEnd [])
+  return (LetIn decls command)
 
 parseDeclaration :: Parser Declaration
 parseDeclaration = do
@@ -273,15 +274,17 @@ parsePrintInt = do
 parseBeginEnd :: Parser Command
 parseBeginEnd = do
   parseToken $ parseString "begin"
-  cmds <- parseCommands
+  cmds <- parseCommands <|> return []
   parseToken $ parseString "end"
   return (BeginEnd cmds)
 
 parseCommands :: Parser [Command]
-parseCommands = do
-  cmd <- parseCommand
-  cmds <- many (parseToken $ parseString ";") *> parseCommands <|> return []
-  return (cmd : cmds)
+parseCommands =
+  do
+    cmd <- parseCommand
+    cmds <- many (parseToken $ parseString ";") *> parseCommands <|> return []
+    return (cmd : cmds)
+    <|> pure []
 
 parseIdentifier :: Parser Identifier
 parseIdentifier = do

@@ -35,7 +35,7 @@ main = do
             then do
               tamCode <- map read . lines <$> readFile sourceFile
               putStrLn "Executing TAM code"
-              stack <- execTAM [] tamCode 0
+              stack <- execTAM tamCode
               putStrLn $ "Final stack: " ++ show stack
             else
               putStrLn "Use .mt for source files or .tam for compiled files"
@@ -51,7 +51,7 @@ runFile sourceFile = do
     [(program, "")] -> do
       putStrLn "Executing TAM code"
       let compiledCode = compileProgram program
-      stack <- execTAM [] compiledCode 0
+      stack <- execTAM compiledCode
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
@@ -62,7 +62,7 @@ traceRunFile sourceFile = do
     [(program, "")] -> do
       putStrLn "Executing TAM code"
       let compiledCode = compileProgram program
-      stack <- traceTAM [] compiledCode
+      stack <- traceTAM compiledCode
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
@@ -78,7 +78,7 @@ getInsts sourceFile = do
 stringTraceTAM :: String -> IO Stack
 stringTraceTAM expression = do
   let instructions = compArith expression
-  traceTAM [] instructions
+  traceTAM instructions
 
 compArith :: String -> [TAMInst]
 compArith expression = case parse parseExpr expression of

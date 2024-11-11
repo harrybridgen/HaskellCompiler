@@ -1,5 +1,6 @@
-let var x := 3
+let 
 in
 begin
-    x : x % 1
+begin
+end
 end

@@ -28,7 +28,7 @@ data TAMInst
   | STORE Address
   deriving (Read, Show, Eq)
 
-type LabelID = Integer
+type LabelID = String
 
 type Address = Integer
 
@@ -84,6 +84,37 @@ execute inst = do
     JUMPIFZ labelID -> executeJumpIfZero labelID
     HALT -> executeHalt
     LABEL _ -> return ()
+
+readInst :: String -> TAMInst
+readInst input = case words input of
+  ["LOADL", x] -> LOADL (read x)
+  ["ADD"] -> ADD
+  ["SUB"] -> SUB
+  ["MUL"] -> MUL
+  ["DIV"] -> DIV
+  ["NEG"] -> NEG
+  ["MOD"] -> MOD
+  ["AND"] -> AND
+  ["OR"] -> OR
+  ["NOT"] -> NOT
+  ["LSS"] -> LSS
+  ["GTR"] -> GTR
+  ["EQL"] -> EQL
+  ["HALT"] -> HALT
+  ["GETINT"] -> GETINT
+  ["PUTINT"] -> PUTINT
+  ["Label", labelID] -> LABEL labelID
+  ["JUMP", labelID] -> JUMP labelID
+  ["JUMPIFZ", labelID] -> JUMPIFZ labelID
+  ["LOAD", addr] -> LOAD (read addr)
+  ["STORE", addr] -> STORE (read addr)
+  _ -> error ("Invalid instruction: " ++ input)
+
+showInst :: TAMInst -> String
+showInst (LABEL lbl) = "Label " ++ lbl
+showInst (JUMP lbl) = "JUMP " ++ lbl
+showInst (JUMPIFZ lbl) = "JUMPIFZ " ++ lbl
+showInst inst = show inst
 
 executeBinaryOp :: (Integer -> Integer -> Integer) -> StateIO TAMState ()
 executeBinaryOp op = do
@@ -177,7 +208,7 @@ comparison op x y = if op x y then 1 else 0
 findLabel :: LabelID -> [TAMInst] -> Int
 findLabel labelID instructions = case elemIndex (LABEL labelID) instructions of
   Just index -> index
-  Nothing -> error ("Label " ++ show labelID ++ " not found.")
+  Nothing -> error ("Label " ++ labelID ++ " not found.")
 
 getIntFromTerminal :: IO Integer
 getIntFromTerminal = do
@@ -200,5 +231,5 @@ traceProgram = do
       let inst = tsInstruction ts
       execute inst
       ts' <- get
-      lift $ putStrLn $ show inst ++ "\t\t" ++ show (tsStack ts')
+      lift $ putStrLn $ showInst inst ++ "\t\t" ++ show (tsStack ts')
       traceProgram

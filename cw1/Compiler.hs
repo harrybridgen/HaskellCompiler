@@ -4,27 +4,6 @@ import Data.Char
 import Data.List
 import Debug.Trace
 import Grammar
-  ( BinOperator
-      ( Addition,
-        Conjunction,
-        Disjunction,
-        Division,
-        Equal,
-        GreaterThan,
-        GreaterThanOrEqual,
-        LessThan,
-        LessThanOrEqual,
-        Multiplication,
-        NotEqual,
-        Subtraction
-      ),
-    Command (..),
-    Declaration (..),
-    Expr (..),
-    Identifier,
-    Program (..),
-    UnOperator (Negation, Not),
-  )
 import Parser
 import State
 import TAM
@@ -144,7 +123,8 @@ freshLabel :: State CompilerState LabelID
 freshLabel = do
   (env, labelCounter) <- get
   put (env, labelCounter + 1)
-  return labelCounter
+  let newLabel = "#" ++ show labelCounter
+  return newLabel
 
 expCode :: Expr -> VarEnv -> [TAMInst]
 expCode (LitInteger x) _ = expCodeLitInteger x
@@ -172,20 +152,13 @@ expCodeBinOp Equal ast ast' env = expCode ast env ++ expCode ast' env ++ [EQL]
 expCodeBinOp LessThanOrEqual ast1 ast2 env =
   expCode ast1 env
     ++ expCode ast2 env
-    ++ [LSS]
-    ++ expCode ast1 env
-    ++ expCode ast2 env
-    ++ [EQL]
-    ++ [OR]
+    ++ [GTR, NOT]
 expCodeBinOp GreaterThanOrEqual ast1 ast2 env =
   expCode ast1 env
     ++ expCode ast2 env
-    ++ [GTR]
-    ++ expCode ast1 env
-    ++ expCode ast2 env
-    ++ [EQL]
-    ++ [OR]
-expCodeBinOp NotEqual ast1 ast2 env = expCode ast1 env ++ expCode ast2 env ++ [EQL, NOT]
+    ++ [LSS, NOT]
+expCodeBinOp NotEqual ast1 ast2 env =
+  expCode ast1 env ++ expCode ast2 env ++ [EQL, NOT]
 
 expCodeUnOp :: UnOperator -> Expr -> VarEnv -> [TAMInst]
 expCodeUnOp Negation ast env = expCode ast env ++ [NEG]

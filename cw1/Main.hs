@@ -27,13 +27,13 @@ main = do
             [(program, "")] -> do
               let compiledCode = compileProgram program
               let tamFile = takeWhile (/= '.') sourceFile ++ ".tam"
-              writeFile tamFile (unlines $ map show compiledCode)
+              writeFile tamFile (unlines $ map showInst compiledCode)
               putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
             _ -> putStrLn "Syntax error"
         else
           if ".tam" `isSuffixOf` sourceFile
             then do
-              tamCode <- map read . lines <$> readFile sourceFile
+              tamCode <- map readInst . lines <$> readFile sourceFile
               putStrLn "Executing TAM code"
               stack <- execTAM tamCode
               putStrLn $ "Final stack: " ++ show stack

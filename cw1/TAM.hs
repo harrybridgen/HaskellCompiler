@@ -2,6 +2,7 @@ module TAM where
 
 import Data.Char
 import Data.List
+import Parser
 import StateIO
 
 data TAMInst
@@ -85,8 +86,11 @@ execute inst = do
     HALT -> executeHalt
     LABEL _ -> return ()
 
-readInst :: String -> TAMInst
-readInst input = case words input of
+parseTAM :: String -> [TAMInst]
+parseTAM = map parseInst . filter (not . null) . lines
+
+parseInst :: String -> TAMInst
+parseInst input = case words input of
   ["LOADL", x] -> LOADL (read x)
   ["ADD"] -> ADD
   ["SUB"] -> SUB

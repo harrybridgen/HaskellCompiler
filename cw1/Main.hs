@@ -33,9 +33,9 @@ main = do
         else
           if ".tam" `isSuffixOf` sourceFile
             then do
-              tamCode <- map readInst . lines <$> readFile sourceFile
+              instructions <- parseTAM <$> readFile sourceFile
               putStrLn "Executing TAM code"
-              stack <- execTAM tamCode
+              stack <- execTAM instructions
               putStrLn $ "Final stack: " ++ show stack
             else
               putStrLn "Use .mt for source files or .tam for compiled files"
@@ -53,8 +53,8 @@ runMT sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
-traceMT :: FilePath -> IO ()
-traceMT sourceFile = do
+runTraceMT :: FilePath -> IO ()
+runTraceMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
@@ -64,13 +64,27 @@ traceMT sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
+runTAM :: FilePath -> IO ()
+runTAM sourceFile = do
+  tamCode <- parseTAM <$> readFile sourceFile
+  putStrLn "Executing TAM code"
+  stack <- execTAM tamCode
+  putStrLn $ "Final stack: " ++ show stack
+
+runTraceTAM :: FilePath -> IO ()
+runTraceTAM sourceFile = do
+  tamCode <- parseTAM <$> readFile sourceFile
+  putStrLn "Executing TAM code"
+  stack <- traceTAM tamCode
+  putStrLn $ "Final stack: " ++ show stack
+
 instsMT :: FilePath -> IO ()
 instsMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
       let compiledCode = compileProgram program
-      mapM_ print compiledCode
+      putStrLn $ unlines $ map showInst compiledCode
     _ -> putStrLn "Syntax error"
 
 traceExpr :: String -> IO Stack

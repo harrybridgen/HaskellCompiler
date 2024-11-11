@@ -11,25 +11,24 @@ parse :: Parser a -> String -> [(a, String)]
 parse (Parser pFunct) = pFunct
 
 instance Functor Parser where
-  fmap fFunct (Parser pFunct) = Parser (\input -> [(fFunct result, rest) | (result, rest) <- pFunct input])
+  fmap fFunct (Parser pFunct) = Parser (map (\(result, rest) -> (fFunct result, rest)) . pFunct)
 
 instance Applicative Parser where
   pure result = Parser (\input -> [(result, input)])
   (Parser pFunct1) <*> (Parser pFunct2) =
     Parser
-      ( \input ->
-          [ (f result, rest2)
-            | (f, rest1) <- pFunct1 input,
-              (result, rest2) <- pFunct2 rest1
-          ]
+      ( concatMap
+          ( \(f, rest1) ->
+              map (\(result, rest2) -> (f result, rest2)) (pFunct2 rest1)
+          )
+          . pFunct1
       )
 
 instance Monad Parser where
   return = pure
   (Parser pFunct) >>= pFunct2 =
     Parser
-      ( \input ->
-          concat [runParser (pFunct2 result) rest | (result, rest) <- pFunct input]
+      ( concatMap (\(result, rest) -> runParser (pFunct2 result) rest) . pFunct
       )
 
 instance Alternative Parser where

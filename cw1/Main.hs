@@ -26,7 +26,7 @@ main = do
           case parse parseProgram sourceCode of
             [(program, "")] -> do
               let compiledCode = compileProgram program
-              let tamFile = newFile sourceFile
+              let tamFile = takeWhile (/= '.') sourceFile ++ ".tam"
               writeFile tamFile (unlines $ map show compiledCode)
               putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
             _ -> putStrLn "Syntax error"
@@ -41,11 +41,9 @@ main = do
               putStrLn "Use .mt for source files or .tam for compiled files"
     _ -> putStrLn "Usage: ./Main example.mt"
 
-newFile :: FilePath -> FilePath
-newFile file = takeWhile (/= '.') file ++ ".tam"
-
-runFile :: FilePath -> IO ()
-runFile sourceFile = do
+-- Functions for testing in GHCi
+runMT :: FilePath -> IO ()
+runMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
@@ -55,8 +53,8 @@ runFile sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
-traceRunFile :: FilePath -> IO ()
-traceRunFile sourceFile = do
+traceMT :: FilePath -> IO ()
+traceMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
@@ -66,8 +64,8 @@ traceRunFile sourceFile = do
       putStrLn $ "Final Stack: " ++ show stack
     _ -> putStrLn "Syntax error"
 
-getInsts :: FilePath -> IO ()
-getInsts sourceFile = do
+instsMT :: FilePath -> IO ()
+instsMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
@@ -75,8 +73,8 @@ getInsts sourceFile = do
       mapM_ print compiledCode
     _ -> putStrLn "Syntax error"
 
-stringTraceTAM :: String -> IO Stack
-stringTraceTAM expression = do
+traceExpr :: String -> IO Stack
+traceExpr expression = do
   let instructions = compArith expression
   traceTAM instructions
 

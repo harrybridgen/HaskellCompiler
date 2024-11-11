@@ -31,9 +31,6 @@ get = StateIO $ \s -> return (s, s)
 put :: st -> StateIO st ()
 put newState = StateIO $ const (return ((), newState))
 
-gets :: (st -> a) -> StateIO st a
-gets f = StateIO $ \s -> return (f s, s)
-
 evalStateIO :: StateIO st a -> st -> IO a
 evalStateIO (StateIO run) s = do
   (a, _) <- run s

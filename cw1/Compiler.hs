@@ -4,6 +4,27 @@ import Data.Char
 import Data.List
 import Debug.Trace
 import Grammar
+  ( BinOperator
+      ( Addition,
+        Conjunction,
+        Disjunction,
+        Division,
+        Equal,
+        GreaterThan,
+        GreaterThanOrEqual,
+        LessThan,
+        LessThanOrEqual,
+        Multiplication,
+        NotEqual,
+        Subtraction
+      ),
+    Command (..),
+    Declaration (..),
+    Expr (..),
+    Identifier,
+    Program (..),
+    UnOperator (Negation, Not),
+  )
 import Parser
 import State
 import TAM
@@ -14,52 +35,6 @@ type LabelCounter = Integer
 
 type CompilerState = (VarEnv, LabelCounter)
 
-expCode :: Expr -> VarEnv -> [TAMInst]
-expCode (LitInteger x) _ = [LOADL x]
-expCode (Var var) env = [LOAD (lookupVar var env)]
-expCode (BinOp Addition ast ast') env = expCode ast env ++ expCode ast' env ++ [ADD]
-expCode (BinOp Subtraction ast ast') env = expCode ast env ++ expCode ast' env ++ [SUB]
-expCode (BinOp Multiplication ast ast') env = expCode ast env ++ expCode ast' env ++ [MUL]
-expCode (BinOp Division ast ast') env = expCode ast env ++ expCode ast' env ++ [DIV]
-expCode (BinOp Conjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [AND]
-expCode (BinOp Disjunction ast ast') env = expCode ast env ++ expCode ast' env ++ [OR]
-expCode (UnOp Negation ast) env = expCode ast env ++ [NEG]
-expCode (UnOp Not ast) env = expCode ast env ++ [NOT]
-expCode (BinOp LessThan ast ast') env = expCode ast env ++ expCode ast' env ++ [LSS]
-expCode (BinOp GreaterThan ast ast') env = expCode ast env ++ expCode ast' env ++ [GTR]
-expCode (BinOp Equal ast ast') env = expCode ast env ++ expCode ast' env ++ [EQL]
-expCode (BinOp LessThanOrEqual ast1 ast2) env =
-  expCode ast1 env
-    ++ expCode ast2 env
-    ++ [LSS]
-    ++ expCode ast1 env
-    ++ expCode ast2 env
-    ++ [EQL]
-    ++ [OR]
-expCode (BinOp GreaterThanOrEqual ast1 ast2) env =
-  expCode ast1 env
-    ++ expCode ast2 env
-    ++ [GTR]
-    ++ expCode ast1 env
-    ++ expCode ast2 env
-    ++ [EQL]
-    ++ [OR]
-expCode (BinOp NotEqual ast1 ast2) env =
-  expCode ast1 env
-    ++ expCode ast2 env
-    ++ [EQL]
-    ++ [NOT]
-expCode (Conditional b x y) env =
-  expCode b env
-    ++ expCode x env
-    ++ [MUL]
-    ++ [LOADL 1]
-    ++ expCode b env
-    ++ [SUB]
-    ++ expCode y env
-    ++ [MUL]
-    ++ [ADD]
-
 compileProgram :: Program -> [TAMInst]
 compileProgram (LetIn declarations command) = evalState compileState ([], 0)
   where
@@ -67,6 +42,17 @@ compileProgram (LetIn declarations command) = evalState compileState ([], 0)
       declareInst <- declareVars declarations
       commandInst <- commandCode command
       return (declareInst ++ commandInst ++ [HALT])
+
+declareVars :: [Declaration] -> State CompilerState [TAMInst]
+declareVars [] = return []
+declareVars ((VarDeclare var) : declarations) = do
+  inst <- declareVar var
+  rest <- declareVars declarations
+  return (inst ++ rest)
+declareVars ((VarInitialize var expr) : declarations) = do
+  inst <- initVar var expr
+  rest <- declareVars declarations
+  return (inst ++ rest)
 
 declareVar :: Identifier -> State CompilerState [TAMInst]
 declareVar var = do
@@ -85,40 +71,40 @@ initVar var expr = do
   let exprInst = expCode expr env
   return (exprInst ++ [STORE addr])
 
-declareVars :: [Declaration] -> State CompilerState [TAMInst]
-declareVars [] = return []
-declareVars ((VarDeclare var) : declarations) = do
-  inst <- declareVar var
-  rest <- declareVars declarations
-  return (inst ++ rest)
-declareVars ((VarInitialize var expr) : declarations) = do
-  inst <- initVar var expr
-  rest <- declareVars declarations
-  return (inst ++ rest)
-
-lookupVar :: Identifier -> VarEnv -> Address
-lookupVar var env = case lookup var env of
-  Just addr -> addr
-  Nothing -> error ("Variable " ++ show var ++ " not declared.")
-
 commandCode :: Command -> State CompilerState [TAMInst]
-commandCode (Assignment var expr) = do
+commandCode (Assignment var expr) = compileAssignment var expr
+commandCode (PrintInt x) = compilePrint x
+commandCode (BeginEnd cmds) = compileBeginEnd cmds
+commandCode (GetInt var) = compileGetInt var
+commandCode (If cond cmd1 cmd2) = compileIf cond cmd1 cmd2
+commandCode (While cond cmd) = compileWhile cond cmd
+
+compileAssignment :: Identifier -> Expr -> State CompilerState [TAMInst]
+compileAssignment var expr = do
   env <- gets fst
   let exprInst = expCode expr env
   return (exprInst ++ [STORE (lookupVar var env)])
-commandCode (PrintInt x) = do
+
+compilePrint :: Expr -> State CompilerState [TAMInst]
+compilePrint expr = do
   env <- gets fst
-  let exprCode = expCode x env
-  return (exprCode ++ [PUTINT])
-commandCode (BeginEnd []) = return []
-commandCode (BeginEnd (cmd : cmds)) = do
+  let exprInst = expCode expr env
+  return (exprInst ++ [PUTINT])
+
+compileBeginEnd :: [Command] -> State CompilerState [TAMInst]
+compileBeginEnd [] = return []
+compileBeginEnd (cmd : cmds) = do
   inst <- commandCode cmd
-  restInst <- commandCode (BeginEnd cmds)
+  restInst <- compileBeginEnd cmds
   return (inst ++ restInst)
-commandCode (GetInt var) = do
+
+compileGetInt :: Identifier -> State CompilerState [TAMInst]
+compileGetInt var = do
   env <- gets fst
   return [GETINT, STORE (lookupVar var env)]
-commandCode (If cond cmd1 cmd2) = do
+
+compileIf :: Expr -> Command -> Command -> State CompilerState [TAMInst]
+compileIf cond cmd1 cmd2 = do
   env <- gets fst
   let condCode = expCode cond env
   label1 <- freshLabel
@@ -133,7 +119,9 @@ commandCode (If cond cmd1 cmd2) = do
       ++ [LABEL label1]
       ++ cmd2Code
       ++ [LABEL label2]
-commandCode (While cond cmd) = do
+
+compileWhile :: Expr -> Command -> State CompilerState [TAMInst]
+compileWhile cond cmd = do
   env <- gets fst
   label1 <- freshLabel
   label2 <- freshLabel
@@ -147,8 +135,70 @@ commandCode (While cond cmd) = do
       ++ [JUMP label1]
       ++ [LABEL label2]
 
+lookupVar :: Identifier -> VarEnv -> Address
+lookupVar var env = case lookup var env of
+  Just addr -> addr
+  Nothing -> error ("Variable " ++ show var ++ " not declared.")
+
 freshLabel :: State CompilerState LabelID
 freshLabel = do
   (env, labelCounter) <- get
   put (env, labelCounter + 1)
   return labelCounter
+
+expCode :: Expr -> VarEnv -> [TAMInst]
+expCode (LitInteger x) _ = expCodeLitInteger x
+expCode (Var var) env = expCodeVar var env
+expCode (BinOp op ast ast') env = expCodeBinOp op ast ast' env
+expCode (UnOp op ast) env = expCodeUnOp op ast env
+expCode (Conditional b x y) env = expCodeConditional b x y env
+
+expCodeLitInteger :: Integer -> [TAMInst]
+expCodeLitInteger x = [LOADL x]
+
+expCodeVar :: Identifier -> VarEnv -> [TAMInst]
+expCodeVar var env = [LOAD (lookupVar var env)]
+
+expCodeBinOp :: BinOperator -> Expr -> Expr -> VarEnv -> [TAMInst]
+expCodeBinOp Addition ast ast' env = expCode ast env ++ expCode ast' env ++ [ADD]
+expCodeBinOp Subtraction ast ast' env = expCode ast env ++ expCode ast' env ++ [SUB]
+expCodeBinOp Multiplication ast ast' env = expCode ast env ++ expCode ast' env ++ [MUL]
+expCodeBinOp Division ast ast' env = expCode ast env ++ expCode ast' env ++ [DIV]
+expCodeBinOp Conjunction ast ast' env = expCode ast env ++ expCode ast' env ++ [AND]
+expCodeBinOp Disjunction ast ast' env = expCode ast env ++ expCode ast' env ++ [OR]
+expCodeBinOp LessThan ast ast' env = expCode ast env ++ expCode ast' env ++ [LSS]
+expCodeBinOp GreaterThan ast ast' env = expCode ast env ++ expCode ast' env ++ [GTR]
+expCodeBinOp Equal ast ast' env = expCode ast env ++ expCode ast' env ++ [EQL]
+expCodeBinOp LessThanOrEqual ast1 ast2 env =
+  expCode ast1 env
+    ++ expCode ast2 env
+    ++ [LSS]
+    ++ expCode ast1 env
+    ++ expCode ast2 env
+    ++ [EQL]
+    ++ [OR]
+expCodeBinOp GreaterThanOrEqual ast1 ast2 env =
+  expCode ast1 env
+    ++ expCode ast2 env
+    ++ [GTR]
+    ++ expCode ast1 env
+    ++ expCode ast2 env
+    ++ [EQL]
+    ++ [OR]
+expCodeBinOp NotEqual ast1 ast2 env = expCode ast1 env ++ expCode ast2 env ++ [EQL, NOT]
+
+expCodeUnOp :: UnOperator -> Expr -> VarEnv -> [TAMInst]
+expCodeUnOp Negation ast env = expCode ast env ++ [NEG]
+expCodeUnOp Not ast env = expCode ast env ++ [NOT]
+
+expCodeConditional :: Expr -> Expr -> Expr -> VarEnv -> [TAMInst]
+expCodeConditional b x y env =
+  expCode b env
+    ++ expCode x env
+    ++ [MUL]
+    ++ [LOADL 1]
+    ++ expCode b env
+    ++ [SUB]
+    ++ expCode y env
+    ++ [MUL]
+    ++ [ADD]

@@ -1,16 +1,15 @@
 LOADL 0 GETINT LOADL 1   
 
 Label loop_start
-LOAD 1 LOAD 0    
-GRT       
+LOAD 1 LOAD 0 GRT       
 JUMPIFZ end
 
-LOAD 2 LOAD 1    
+
+LOAD 2    LOAD 1    
 MUL       
 STORE 2  
 
-LOAD 1 LOADL 1   
-SUB       
+LOAD 1 LOADL 1 SUB       
 STORE 1   
 
 JUMP loop_start

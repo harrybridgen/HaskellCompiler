@@ -27,7 +27,7 @@ main = do
             [(program, "")] -> do
               let compiledCode = compileProgram program
               let tamFile = takeWhile (/= '.') sourceFile ++ ".tam"
-              writeFile tamFile (unlines $ map showInst compiledCode)
+              writeFile tamFile (foldMap (\inst -> showInst inst ++ "\n") compiledCode)
               putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
             _ -> putStrLn "Syntax error"
         else

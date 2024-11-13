@@ -147,12 +147,12 @@ expCodeBinOp Division ast ast' env = expCode ast env ++ expCode ast' env ++ [DIV
 expCodeBinOp Conjunction ast ast' env = expCode ast env ++ expCode ast' env ++ [AND]
 expCodeBinOp Disjunction ast ast' env = expCode ast env ++ expCode ast' env ++ [OR]
 expCodeBinOp LessThan ast ast' env = expCode ast env ++ expCode ast' env ++ [LSS]
-expCodeBinOp GreaterThan ast ast' env = expCode ast env ++ expCode ast' env ++ [GTR]
+expCodeBinOp GreaterThan ast ast' env = expCode ast env ++ expCode ast' env ++ [GRT]
 expCodeBinOp Equal ast ast' env = expCode ast env ++ expCode ast' env ++ [EQL]
 expCodeBinOp LessThanOrEqual ast1 ast2 env =
   expCode ast1 env
     ++ expCode ast2 env
-    ++ [GTR, NOT]
+    ++ [GRT, NOT]
 expCodeBinOp GreaterThanOrEqual ast1 ast2 env =
   expCode ast1 env
     ++ expCode ast2 env

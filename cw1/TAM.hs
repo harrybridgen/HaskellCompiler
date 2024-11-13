@@ -1,5 +1,6 @@
 module TAM where
 
+import Control.Applicative
 import Data.Char
 import Data.List
 import Parser
@@ -17,7 +18,7 @@ data TAMInst
   | OR
   | NOT
   | LSS
-  | GTR
+  | GRT
   | EQL
   | HALT
   | GETINT
@@ -75,7 +76,7 @@ execute inst = do
     OR -> executeBinaryOp logicOr
     NOT -> executeUnaryOp logicNot
     LSS -> executeBinaryOp (comparison (<))
-    GTR -> executeBinaryOp (comparison (>))
+    GRT -> executeBinaryOp (comparison (>))
     EQL -> executeBinaryOp (comparison (==))
     LOAD addr -> executeLoad addr
     STORE addr -> executeStore addr
@@ -86,33 +87,39 @@ execute inst = do
     HALT -> executeHalt
     LABEL _ -> return ()
 
-parseTAM :: String -> [TAMInst]
-parseTAM = map parseInst . filter (not . null) . lines
+parseTAMProgram :: Parser [TAMInst]
+parseTAMProgram = some (instTAM <* parseSpace)
 
-parseInst :: String -> TAMInst
-parseInst input = case words input of
-  ["LOADL", x] -> LOADL (read x)
-  ["ADD"] -> ADD
-  ["SUB"] -> SUB
-  ["MUL"] -> MUL
-  ["DIV"] -> DIV
-  ["NEG"] -> NEG
-  ["MOD"] -> MOD
-  ["AND"] -> AND
-  ["OR"] -> OR
-  ["NOT"] -> NOT
-  ["LSS"] -> LSS
-  ["GTR"] -> GTR
-  ["EQL"] -> EQL
-  ["HALT"] -> HALT
-  ["GETINT"] -> GETINT
-  ["PUTINT"] -> PUTINT
-  ["Label", labelID] -> LABEL labelID
-  ["JUMP", labelID] -> JUMP labelID
-  ["JUMPIFZ", labelID] -> JUMPIFZ labelID
-  ["LOAD", addr] -> LOAD (read addr)
-  ["STORE", addr] -> STORE (read addr)
-  _ -> error ("Invalid instruction: " ++ input)
+parseLabel :: Parser LabelID
+parseLabel = parseToken $ some (satisfy (not . isSpace))
+
+instLOADL :: Parser TAMInst
+instLOADL = do
+  parseToken (parseString "LOADL")
+  LOADL <$> parseInt
+
+instTAM :: Parser TAMInst
+instTAM =
+  (parseToken (parseString "HALT") >> return HALT)
+    <|> instLOADL
+    <|> (parseToken (parseString "ADD") >> return ADD)
+    <|> (parseToken (parseString "SUB") >> return SUB)
+    <|> (parseToken (parseString "MUL") >> return MUL)
+    <|> (parseToken (parseString "DIV") >> return DIV)
+    <|> (parseToken (parseString "NEG") >> return NEG)
+    <|> (parseToken (parseString "AND") >> return AND)
+    <|> (parseToken (parseString "OR") >> return OR)
+    <|> (parseToken (parseString "NOT") >> return NOT)
+    <|> (parseToken (parseString "LSS") >> return LSS)
+    <|> (parseToken (parseString "GRT") >> return GRT)
+    <|> (parseToken (parseString "EQL") >> return EQL)
+    <|> (parseToken (parseString "GETINT") >> return GETINT)
+    <|> (parseToken (parseString "PUTINT") >> return PUTINT)
+    <|> (parseToken (parseString "JUMPIFZ") >> parseLabel >>= return . JUMPIFZ)
+    <|> (parseToken (parseString "JUMP") >> parseLabel >>= return . JUMP)
+    <|> (parseToken (parseString "LOAD") >> parseInt >>= return . LOAD)
+    <|> (parseToken (parseString "STORE") >> parseInt >>= return . STORE)
+    <|> (parseToken (parseString "Label") >> parseLabel >>= return . LABEL)
 
 showInst :: TAMInst -> String
 showInst (LABEL lbl) = "Label " ++ lbl

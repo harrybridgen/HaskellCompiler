@@ -33,10 +33,13 @@ main = do
         else
           if ".tam" `isSuffixOf` sourceFile
             then do
-              instructions <- parseTAM <$> readFile sourceFile
-              putStrLn "Executing TAM code"
-              stack <- execTAM instructions
-              putStrLn $ "Final stack: " ++ show stack
+              tamCode <- parse parseTAMProgram <$> readFile sourceFile
+              case tamCode of
+                [(insts, "")] -> do
+                  putStrLn "Executing TAM code"
+                  stack <- execTAM insts
+                  putStrLn $ "Final stack: " ++ show stack
+                _ -> putStrLn "Error: Invalid TAM syntax"
             else
               putStrLn "Use .mt for source files or .tam for compiled files"
     _ -> putStrLn "Usage: ./Main example.mt"
@@ -66,17 +69,21 @@ runTraceMT sourceFile = do
 
 runTAM :: FilePath -> IO ()
 runTAM sourceFile = do
-  tamCode <- parseTAM <$> readFile sourceFile
-  putStrLn "Executing TAM code"
-  stack <- execTAM tamCode
-  putStrLn $ "Final stack: " ++ show stack
+  tamCode <- parse parseTAMProgram <$> readFile sourceFile
+  case tamCode of
+    [(tamCode, "")] -> do
+      putStrLn "Executing TAM code"
+      stack <- execTAM tamCode
+      putStrLn $ "Final stack: " ++ show stack
 
 runTraceTAM :: FilePath -> IO ()
 runTraceTAM sourceFile = do
-  tamCode <- parseTAM <$> readFile sourceFile
-  putStrLn "Executing TAM code"
-  stack <- traceTAM tamCode
-  putStrLn $ "Final stack: " ++ show stack
+  tamCode <- parse parseTAMProgram <$> readFile sourceFile
+  case tamCode of
+    [(tamCode, "")] -> do
+      putStrLn "Executing TAM code"
+      stack <- traceTAM tamCode
+      putStrLn $ "Final stack: " ++ show stack
 
 instsMT :: FilePath -> IO ()
 instsMT sourceFile = do

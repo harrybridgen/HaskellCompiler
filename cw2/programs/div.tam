@@ -1,0 +1,12 @@
+LOADL 10
+LOADL 5
+LOAD [SB + 1]
+LOAD [SB + 0]
+CALL div
+PUTINT
+HALT
+Label div
+LOAD [LB - 1]
+LOAD [LB - 2]
+DIV
+RETURN 1 2

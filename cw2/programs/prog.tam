@@ -1,0 +1,10 @@
+GETINT
+CALL minus
+PUTINT
+HALT
+
+Label minus
+LOAD 0
+LOADL 1
+SUB
+RETURN 1 1

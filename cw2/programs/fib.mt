@@ -1,8 +1,8 @@
-let var n;
-    var a;
-    var b;
-    var temp;
-    var i
+let var n:Integer;
+    var a:Integer;
+    var b:Integer;
+    var temp:Integer;
+    var i:Integer
 in
 begin
     getint (n);

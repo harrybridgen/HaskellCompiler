@@ -65,19 +65,53 @@ parseCommand =
 
 parseDeclaration :: Parser Declaration
 parseDeclaration = do
-  parseVarInitialize <|> parseVarDeclare
+  parseVarInitialize <|> parseVarDeclare <|> parseFunDefine
+
+parseFunDefine :: Parser Declaration
+parseFunDefine = do
+  parseToken $ parseString "fun"
+  funName <- parseIdentifier
+  parseToken $ parseString "("
+  params <- parseParams
+  parseToken $ parseString ")"
+  parseToken $ parseString ":"
+  returnType <- parseType
+  parseToken $ parseString "="
+  FunDefine funName params returnType <$> parseExpr
 
 parseVarInitialize :: Parser Declaration
 parseVarInitialize = do
   parseToken $ parseString "var"
   var <- parseIdentifier
+  parseToken $ parseString ":"
+  dataType <- parseType
   parseToken $ parseString ":="
-  VarInitialize var <$> parseExpr
+  VarInitialize var dataType <$> parseExpr
 
 parseVarDeclare :: Parser Declaration
 parseVarDeclare = do
   parseToken $ parseString "var"
-  VarDeclare <$> parseIdentifier
+  var <- parseIdentifier
+  parseToken $ parseString ":"
+  VarDeclare var <$> parseType
+
+parseParam :: Parser (Identifier, Type)
+parseParam = do
+  var <- parseIdentifier
+  parseToken $ parseString ":"
+  dataType <- parseType
+  return (var, dataType)
+
+parseParams :: Parser [(Identifier, Type)]
+parseParams = do
+  first <- parseParam
+  rest <- many (parseToken $ parseString ",") *> parseParams <|> return []
+  return (first : rest)
+
+parseType :: Parser Type
+parseType = do
+  parseToken (parseString "Integer" >> return TypeInt)
+    <|> parseToken (parseString "Boolean" >> return TypeBool)
 
 parseAssignment :: Parser Command
 parseAssignment = do
@@ -128,9 +162,8 @@ parseCommands :: Parser [Command]
 parseCommands =
   do
     cmd <- parseCommand
-    cmds <- many (parseToken $ parseString ";") *> parseCommands <|> return []
+    cmds <- (parseToken (parseString ";") *> parseCommands) <|> return []
     return (cmd : cmds)
-    <|> pure []
 
 parseIdentifier :: Parser Identifier
 parseIdentifier = do
@@ -160,8 +193,38 @@ parseTerm :: Parser Expr
 parseTerm =
   parseParentheses
     <|> parseNegation
+    <|> parseBoolean
+    <|> parseFunctionCall
     <|> parseVariable
     <|> parseInteger
+
+parseFunctionCall :: Parser Expr
+parseFunctionCall = do
+  funName <- parseIdentifier
+  parseToken $ parseString "("
+  args <- parseExprs
+  parseToken $ parseString ")"
+  return (FunCall funName args)
+
+parseExprs :: Parser [Expr]
+parseExprs = do
+  first <- parseExpr
+  rest <- many (parseToken (parseString ",") *> parseExpr)
+  return (first : rest)
+
+parseBoolean :: Parser Expr
+parseBoolean = do
+  parseToken $ parseTrue <|> parseFalse
+
+parseTrue :: Parser Expr
+parseTrue = parseToken $ do
+  parseString "true"
+  return (LitBoolean True)
+
+parseFalse :: Parser Expr
+parseFalse = parseToken $ do
+  parseString "false"
+  return (LitBoolean False)
 
 parseLeftAssoc :: Parser Expr -> Parser BinOperator -> Parser Expr
 parseLeftAssoc termParser opParser = do
@@ -281,8 +344,3 @@ parseArith :: String -> Expr
 parseArith arith = case parse parseExpr arith of
   [(exprAST, "")] -> exprAST
   _ -> error "invalid expression"
-
-parseSource :: String -> Program
-parseSource source = case parse parseProgram source of
-  [(programAST, "")] -> programAST
-  _ -> error "invalid source"

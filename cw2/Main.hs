@@ -8,8 +8,10 @@ import Data.List
 import Evaluator
 import Grammar
 import Parser
+import State
 import System.Environment
 import TAM
+import TypeChecker
 
 -- Compile in terminal:
 -- ghc Main.hs -o mtc
@@ -19,30 +21,40 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [sourceFile] ->
-      if ".mt" `isSuffixOf` sourceFile
-        then do
-          sourceCode <- readFile sourceFile
-          case parse parseProgram sourceCode of
-            [(program, "")] -> do
-              let compiledCode = compileProgram program
-              let tamFile = takeWhile (/= '.') sourceFile ++ ".tam"
-              writeFile tamFile (foldMap (\inst -> showInst inst ++ "\n") compiledCode)
-              putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
-            _ -> putStrLn "Syntax error"
-        else
-          if ".tam" `isSuffixOf` sourceFile
-            then do
-              tamCode <- parse parseTAMProgram <$> readFile sourceFile
-              case tamCode of
-                [(insts, "")] -> do
-                  putStrLn "Executing TAM code"
-                  stack <- execTAM insts
-                  putStrLn $ "Final stack: " ++ show stack
-                _ -> putStrLn "Error: Invalid TAM syntax"
-            else
-              putStrLn "Use .mt for source files or .tam for compiled files"
+    [sourceFile] -> processFile sourceFile
     _ -> putStrLn "Usage: ./Main example.mt"
+
+processFile :: FilePath -> IO ()
+processFile sourceFile
+  | ".mt" `isSuffixOf` sourceFile = processSourceFile sourceFile
+  | ".tam" `isSuffixOf` sourceFile = processTamFile sourceFile
+  | otherwise = putStrLn "Use .mt for source files or .tam for compiled files"
+
+processSourceFile :: FilePath -> IO ()
+processSourceFile sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] ->
+      case compileProgram program of
+        Left err -> putStr err
+        Right compiledCode -> putStrLn ("No type errors found for " ++ sourceFile) >> writeTamFile sourceFile compiledCode
+    _ -> putStrLn "Syntax error"
+
+processTamFile :: FilePath -> IO ()
+processTamFile sourceFile = do
+  tamCode <- parse parseTAMProgram <$> readFile sourceFile
+  case tamCode of
+    [(insts, "")] -> do
+      putStrLn "Executing TAM code"
+      stack <- execTAM insts
+      putStrLn $ "Final stack: " ++ show stack
+    _ -> putStrLn ("Error: Invalid TAM syntax " ++ show tamCode)
+
+writeTamFile :: FilePath -> [TAMInst] -> IO ()
+writeTamFile sourceFile compiledCode = do
+  let tamFile = takeWhile (/= '.') sourceFile ++ ".tam"
+  writeFile tamFile (foldMap (\inst -> showInst inst ++ "\n") compiledCode)
+  putStrLn $ "Compiled " ++ sourceFile ++ " to " ++ tamFile
 
 -- Functions for testing in GHCi
 runMT :: FilePath -> IO ()
@@ -51,10 +63,12 @@ runMT sourceFile = do
   case parse parseProgram sourceCode of
     [(program, "")] -> do
       putStrLn "Executing TAM code"
-      let compiledCode = compileProgram program
-      stack <- execTAM compiledCode
-      putStrLn $ "Final Stack: " ++ show stack
-    _ -> putStrLn "Syntax error"
+      case compileProgram program of
+        Left err -> putStr err
+        Right compiledCode -> do
+          putStrLn ("No type errors found for " ++ sourceFile)
+          stack <- execTAM compiledCode
+          putStrLn $ "Final Stack: " ++ show stack
 
 runTraceMT :: FilePath -> IO ()
 runTraceMT sourceFile = do
@@ -62,10 +76,12 @@ runTraceMT sourceFile = do
   case parse parseProgram sourceCode of
     [(program, "")] -> do
       putStrLn "Executing TAM code"
-      let compiledCode = compileProgram program
-      stack <- traceTAM compiledCode
-      putStrLn $ "Final Stack: " ++ show stack
-    _ -> putStrLn "Syntax error"
+      case compileProgram program of
+        Left err -> putStr err
+        Right compiledCode -> do
+          putStrLn ("No type errors found for " ++ sourceFile)
+          stack <- traceTAM compiledCode
+          putStrLn $ "Final Stack: " ++ show stack
 
 runTAM :: FilePath -> IO ()
 runTAM sourceFile = do
@@ -90,16 +106,26 @@ instsMT sourceFile = do
   sourceCode <- readFile sourceFile
   case parse parseProgram sourceCode of
     [(program, "")] -> do
-      let compiledCode = compileProgram program
-      putStrLn $ unlines $ map showInst compiledCode
-    _ -> putStrLn "Syntax error"
+      case compileProgram program of
+        Left err -> putStrLn err
+        Right compiledCode -> do
+          putStrLn ("No type errors found for " ++ sourceFile)
+          putStrLn "TAM instructions:"
+          forM_ compiledCode (putStrLn . showInst)
 
-traceExpr :: String -> IO Stack
-traceExpr expression = do
-  let instructions = compArith expression
-  traceTAM instructions
+parseSource :: FilePath -> IO Program
+parseSource sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] -> return program
+    _ -> error "Syntax error"
 
-compArith :: String -> [TAMInst]
-compArith expression = case parse parseExpr expression of
-  [(ast, "")] -> expCode ast []
-  _ -> error "Compilation error"
+parseSourceCheck :: FilePath -> IO ()
+parseSourceCheck sourceFile = do
+  sourceCode <- readFile sourceFile
+  case parse parseProgram sourceCode of
+    [(program, "")] -> do
+      let (errors, _) = runState (checkProgram program) []
+      if null errors
+        then putStrLn "No type errors found"
+        else putStrLn $ unlines errors

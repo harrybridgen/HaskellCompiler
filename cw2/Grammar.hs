@@ -1,32 +1,37 @@
--- expression grammar
+-- Grammar
 -- ----------------------------------------------
--- expr  ::= mexpr | mexpr + expr | mexpr - expr
--- mexpr ::=  term | term * mexpr | term / mexpr
--- term  ::=   int |    -term     | ( expr )
+-- expr        ::= term | term + expr | term - expr
+-- mExpr       ::= expr | expr * mExpr | expr / mExpr
+-- term        ::= int | bool | identifier | -term | (expr) | identifier (exprs)
+-- exprs       ::= expr | expr , exprs
 -- ----------------------------------------------
-
--- miniTriangle grammar
+-- program     ::= let declarations in command
+-- declaration ::= var identifier : type
+--               | var identifier : type := expr
+--               | fun identifier (vardecls) : type := expr
+-- vardecl     ::= identifier : type
+-- vardecls    ::= vardecl | vardecl , vardecls
+-- type        ::= Integer | Boolean
 -- ----------------------------------------------
--- program      ::= let declarations in command
--- declaration  ::= var identifier | var identifier = expression
--- declarations ::= declaration | declaration ; declarations
--- command      ::= indentifer := expression
---              | if expression then command else command
---              | while expression do command
---              | getint identifier
---              | printint expression
---              | begin commands end
--- commands     ::= command | command ; commands
+-- command     ::= identifier := expr
+--               | if expr then command else command
+--               | while expr do command
+--               | getint identifier
+--               | printint expr
+--               | begin commands end
+-- commands    ::= command | command ; commands
 -- ----------------------------------------------
 
 module Grammar where
 
 data Expr
   = LitInteger Integer
+  | LitBoolean Bool
   | Var Identifier
   | BinOp BinOperator Expr Expr
   | UnOp UnOperator Expr
   | Conditional Expr Expr Expr
+  | FunCall Identifier [Expr]
   deriving (Show)
 
 data Command
@@ -40,9 +45,13 @@ data Command
 
 type Identifier = String
 
+data Type = TypeInt | TypeBool
+  deriving (Eq, Show)
+
 data Declaration
-  = VarDeclare Identifier
-  | VarInitialize Identifier Expr
+  = VarDeclare Identifier Type
+  | VarInitialize Identifier Type Expr
+  | FunDefine Identifier [(Identifier, Type)] Type Expr
   deriving (Show)
 
 data Program = LetIn [Declaration] Command

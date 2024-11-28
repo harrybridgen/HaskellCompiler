@@ -140,11 +140,11 @@ executeJump labelID = do
   ts <- get
   put $ ts {tsCounter = findLabel labelID (tsCode ts)}
 
-parseTAMProgram :: Parser [TAMInst]
-parseTAMProgram = some (instTAM <* parseSpace)
-
 parseLabel :: Parser LabelID
 parseLabel = parseToken $ some (satisfy (not . isSpace))
+
+parseTAMProgram :: Parser [TAMInst]
+parseTAMProgram = some (instTAM <* parseSpace)
 
 instLOADL :: Parser TAMInst
 instLOADL = do

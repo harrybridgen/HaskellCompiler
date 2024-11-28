@@ -5,7 +5,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Char
 import Data.List
-import Evaluator
 import Grammar
 import Parser
 import State

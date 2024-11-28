@@ -159,14 +159,8 @@ store :: Address -> Integer -> TAMState -> TAMState
 store addr newVal ts =
   let stack = tsStack ts
       index = length stack - 1 - fromIntegral addr
-      newStack = replaceAt index newVal stack
+      newStack = take index stack ++ [newVal] ++ drop (index + 1) stack
    in ts {tsStack = newStack}
-
-replaceAt :: Int -> a -> [a] -> [a]
-replaceAt idx val xs =
-  let before = take idx xs
-      after = tail (drop idx xs)
-   in before ++ [val] ++ after
 
 executePutInt :: StateIO TAMState ()
 executePutInt = do

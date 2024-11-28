@@ -48,7 +48,8 @@ initVar var expr = do
       newEnv = (var, addr) : env
   put (newEnv, labelCounter)
   let exprInst = expCode expr env
-  return (exprInst ++ [STORE addr])
+  return (exprInst ++ [STORE addr]) -- THIS WAS WRONG, IT SHOULDNT STORE THE VALUE SINCE ITS AN INITIALIZATION (NOT AN ASSIGNMENT)
+  -- STORE pops the value from the stack and stores it, so if we initialize a variable and STORE it, the stack is momentarily empty and therefore doesnt have an index 0
 
 commandCode :: Command -> State CompilerState [TAMInst]
 commandCode (Assignment var expr) = compileAssignment var expr

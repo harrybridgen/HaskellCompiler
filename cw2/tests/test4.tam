@@ -1,0 +1,29 @@
+LOADL 0
+LOADL 0
+GETINT
+STORE [SB + 0]
+GETINT
+STORE [SB + 1]
+LOAD [SB + 0]
+LOAD [SB + 1]
+CALL power
+PUTINT
+HALT
+Label power
+LOAD [LB - 1]
+LOADL 0
+GRT
+NOT
+JUMPIFZ #0
+LOADL 1
+JUMP #1
+Label #0
+LOAD [LB - 2]
+LOAD [LB - 2]
+LOAD [LB - 1]
+LOADL 1
+SUB
+CALL power
+MUL
+Label #1
+RETURN 1 2

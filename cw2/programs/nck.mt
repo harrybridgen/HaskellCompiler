@@ -1,6 +1,6 @@
 let 
     fun fact (n: Integer) : Integer = n <= 0 ? 1 : n * fact(n - 1);
-    fun nck (n: Integer, k: Integer) : Integer = n < k ? 0 : fact(n) / (fact(n-k) * fact(k));
+    fun nck (n: Integer, k: Integer) : Integer = n < k || n < 0 || k < 0 ? 0 : fact(n) / (fact(n-k) * fact(k));
     var n : Integer;
     var k : Integer;
     var result: Integer

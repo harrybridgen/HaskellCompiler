@@ -5,8 +5,8 @@ GETINT
 STORE [SB + 0]
 GETINT
 STORE [SB + 1]
-LOAD [SB + 1]
 LOAD [SB + 0]
+LOAD [SB + 1]
 CALL nck
 STORE [SB + 2]
 LOAD [SB + 2]
@@ -30,20 +30,28 @@ MUL
 Label #1
 RETURN 1 1
 Label nck
-LOAD [LB - 1]
 LOAD [LB - 2]
+LOAD [LB - 1]
 LSS
+LOAD [LB - 2]
+LOADL 0
+LSS
+OR
+LOAD [LB - 1]
+LOADL 0
+LSS
+OR
 JUMPIFZ #2
 LOADL 0
 JUMP #3
 Label #2
-LOAD [LB - 1]
-CALL fact
-LOAD [LB - 1]
 LOAD [LB - 2]
+CALL fact
+LOAD [LB - 2]
+LOAD [LB - 1]
 SUB
 CALL fact
-LOAD [LB - 2]
+LOAD [LB - 1]
 CALL fact
 MUL
 DIV

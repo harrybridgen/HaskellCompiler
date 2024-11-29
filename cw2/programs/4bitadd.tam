@@ -12,131 +12,131 @@ LOADL 0
 LOADL 0
 LOADL 0
 LOADL 0
-LOAD [SB + 0]
-LOAD [SB + 5]
 LOAD [SB + 1]
+LOAD [SB + 5]
 CALL xor
+LOAD [SB + 0]
 CALL xor
 STORE [SB + 9]
-LOAD [SB + 0]
-LOAD [SB + 5]
-LOAD [SB + 1]
+LOAD [SB + 2]
+LOAD [SB + 6]
 CALL xor
-CALL and
-LOAD [SB + 5]
 LOAD [SB + 1]
+LOAD [SB + 5]
+CALL and
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL xor
+LOAD [SB + 0]
 CALL and
 CALL or
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL xor
 CALL xor
 STORE [SB + 10]
-LOAD [SB + 0]
-LOAD [SB + 5]
-LOAD [SB + 1]
-CALL xor
-CALL and
-LOAD [SB + 5]
-LOAD [SB + 1]
-CALL and
-CALL or
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL xor
-CALL and
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL and
-CALL or
-LOAD [SB + 7]
 LOAD [SB + 3]
+LOAD [SB + 7]
 CALL xor
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL and
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL xor
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL and
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL xor
+LOAD [SB + 0]
+CALL and
+CALL or
+CALL and
+CALL or
 CALL xor
 STORE [SB + 11]
-LOAD [SB + 0]
-LOAD [SB + 5]
-LOAD [SB + 1]
-CALL xor
-CALL and
-LOAD [SB + 5]
-LOAD [SB + 1]
-CALL and
-CALL or
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL xor
-CALL and
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL and
-CALL or
-LOAD [SB + 7]
-LOAD [SB + 3]
-CALL xor
-CALL and
-LOAD [SB + 7]
-LOAD [SB + 3]
-CALL and
-CALL or
-LOAD [SB + 8]
 LOAD [SB + 4]
+LOAD [SB + 8]
 CALL xor
+LOAD [SB + 3]
+LOAD [SB + 7]
+CALL and
+LOAD [SB + 3]
+LOAD [SB + 7]
+CALL xor
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL and
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL xor
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL and
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL xor
+LOAD [SB + 0]
+CALL and
+CALL or
+CALL and
+CALL or
+CALL and
+CALL or
 CALL xor
 STORE [SB + 12]
+LOAD [SB + 4]
+LOAD [SB + 8]
+CALL and
+LOAD [SB + 4]
+LOAD [SB + 8]
+CALL xor
+LOAD [SB + 3]
+LOAD [SB + 7]
+CALL and
+LOAD [SB + 3]
+LOAD [SB + 7]
+CALL xor
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL and
+LOAD [SB + 2]
+LOAD [SB + 6]
+CALL xor
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL and
+LOAD [SB + 1]
+LOAD [SB + 5]
+CALL xor
 LOAD [SB + 0]
-LOAD [SB + 5]
-LOAD [SB + 1]
-CALL xor
-CALL and
-LOAD [SB + 5]
-LOAD [SB + 1]
 CALL and
 CALL or
-LOAD [SB + 6]
-LOAD [SB + 2]
-CALL xor
-CALL and
-LOAD [SB + 6]
-LOAD [SB + 2]
 CALL and
 CALL or
-LOAD [SB + 7]
-LOAD [SB + 3]
-CALL xor
-CALL and
-LOAD [SB + 7]
-LOAD [SB + 3]
 CALL and
 CALL or
-LOAD [SB + 8]
-LOAD [SB + 4]
-CALL xor
-CALL and
-LOAD [SB + 8]
-LOAD [SB + 4]
 CALL and
 CALL or
 STORE [SB + 13]
 HALT
 Label and
-LOAD [LB - 1]
 LOAD [LB - 2]
+LOAD [LB - 1]
 AND
 RETURN 1 2
 Label or
-LOAD [LB - 1]
 LOAD [LB - 2]
+LOAD [LB - 1]
 OR
 RETURN 1 2
 Label xor
-LOAD [LB - 1]
 LOAD [LB - 2]
+LOAD [LB - 1]
 NOT
 AND
-LOAD [LB - 1]
-NOT
 LOAD [LB - 2]
+NOT
+LOAD [LB - 1]
 AND
 OR
 RETURN 1 2

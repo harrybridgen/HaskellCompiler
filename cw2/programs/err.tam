@@ -1,20 +1,13 @@
+LOADL 0
 LOADL 1
-LOADL 3
-CALL sqcb
-PUTINT
+LOADL 1
+CALL y
+STORE [SB + 0]
+LOADL 1
+STORE [SB + 0]
 HALT
-Label sqcb
+Label y
 LOAD [LB - 2]
-JUMPIFZ #0
 LOAD [LB - 1]
-LOAD [LB - 1]
-MUL
-JUMP #1
-Label #0
-LOAD [LB - 1]
-LOAD [LB - 1]
-MUL
-LOAD [LB - 1]
-MUL
-Label #1
+ADD
 RETURN 1 2

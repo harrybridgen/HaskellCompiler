@@ -1,0 +1,20 @@
+LOADL 1
+LOAD [SB + 0]
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+CALL stress
+PUTINT
+HALT
+Label stress
+LOAD [LB - 1]
+RETURN 1 1

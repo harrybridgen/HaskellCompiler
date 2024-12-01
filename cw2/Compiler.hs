@@ -54,19 +54,30 @@ declareFuncts (_ : declarations) = declareFuncts declarations
 declareFun :: Identifier -> [(Identifier, Type)] -> Type -> Expr -> State CompilerState [TAMInst]
 declareFun fun args t expr = do
   (env, labelCounter) <- get
+
+  -- Add the function itself to the environment
   let newEnv = (fun, LB (fromIntegral (length env))) : env
+
   put (newEnv, labelCounter)
   funCode fun args t expr
 
 funCode :: Identifier -> [(Identifier, Type)] -> Type -> Expr -> State CompilerState [TAMInst]
-funCode fun args returnType expr = do
-  bodyCode <- expCode expr argEnv
+funCode fun args returnType body = do
+  (env, labelCounter) <- get
+
+  -- Create local context for arguments
+  let localEnv = zip (map fst (reverse args)) (map (\n -> LB (-(fromIntegral n))) [1 .. length args])
+
+  -- Combine global and local contexts
+  let combinedEnv = localEnv ++ env
+
+  -- Generate body code using the combined context
+  bodyCode <- expCode body combinedEnv
+
   return $
     [LABEL fun]
       ++ bodyCode
       ++ [RETURN 1 (length args)]
-  where
-    argEnv = zip (map fst (reverse args)) (map (\n -> LB (-(fromIntegral n))) [1 .. length args])
 
 declareVar :: Identifier -> State CompilerState [TAMInst]
 declareVar var = do
@@ -149,8 +160,8 @@ compileWhile cond cmd = do
       ++ [LABEL label2]
 
 lookupVar :: Identifier -> VarEnv -> Address
-lookupVar var env = case lookup var env of
-  Just addr -> addr
+lookupVar var env = case find ((== var) . fst) env of
+  Just (_, addr) -> addr
   Nothing -> error ("Variable " ++ show var ++ " not declared.")
 
 freshLabel :: State CompilerState LabelID
@@ -187,7 +198,10 @@ expCodeLitInteger :: Integer -> [TAMInst]
 expCodeLitInteger x = [LOADL x]
 
 expCodeVar :: Identifier -> VarEnv -> [TAMInst]
-expCodeVar var env = [LOAD (lookupVar var env)]
+expCodeVar var env =
+  case find ((== var) . fst) env of
+    Just (_, addr) -> [LOAD addr] -- Load the variable's address
+    Nothing -> error ("Variable \"" ++ var ++ "\" not declared.")
 
 expCodeBinOp :: BinOperator -> [TAMInst]
 expCodeBinOp Addition = [ADD]

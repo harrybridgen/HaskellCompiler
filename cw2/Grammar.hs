@@ -33,7 +33,6 @@ data Expr
   | Conditional Expr Expr Expr
   | FunCall Identifier [Expr]
   deriving (Show)
-
 data Command
   = Assignment Identifier Expr
   | If Expr Command Command

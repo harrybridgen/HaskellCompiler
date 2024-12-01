@@ -1,21 +1,24 @@
-GETINT          
-CALL fact       
-PUTINT          
-HALT            
-
+LOADL 0
+GETINT
+STORE [SB + 0]
+LOAD [SB + 0]
+CALL fact
+PUTINT
+HALT
 Label fact
-LOAD [LB - 1]   
-LOADL 1         
-LSS             
-JUMPIFZ else    
-LOADL 1         
-RETURN 1 1    
-
-Label else
-LOAD [LB - 1]  
-LOAD [LB - 1]  
-LOADL 1         
+LOAD [LB - 1]
+LOADL 0
+GRT
+NOT
+JUMPIFZ #0
+LOADL 1
+JUMP #1
+Label #0
+LOAD [LB - 1]
+LOAD [LB - 1]
+LOADL 1
 SUB
-CALL fact       
-MUL             
-RETURN 1 1    
+CALL fact
+MUL
+Label #1
+RETURN 1 1

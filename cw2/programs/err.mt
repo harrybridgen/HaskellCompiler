@@ -1,7 +1,7 @@
 let
-    var x :Integer;
-    fun y (x : Integer) : Boolean = x
+    var x : Integer := 10;
+    var y : Integer := 5;
+    fun addXY (add: Boolean) : Integer =  add ? x+y : 0
 in
-begin
-    x := y(2)
-end
+printint(addXY(true))
+

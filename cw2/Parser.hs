@@ -50,7 +50,7 @@ parseProgram = do
 parseDeclarations :: Parser [Declaration]
 parseDeclarations = do
   decl <- parseDeclaration
-  decls <- many (parseToken $ parseString ";") *> parseDeclarations <|> return []
+  decls <- (parseToken (parseString ";") *> parseDeclarations) <|> return []
   return (decl : decls)
 
 parseCommand :: Parser Command
@@ -159,11 +159,10 @@ parseBeginEnd = do
   return (BeginEnd cmds)
 
 parseCommands :: Parser [Command]
-parseCommands =
-  do
-    cmd <- parseCommand
-    cmds <- (parseToken (parseString ";") *> parseCommands) <|> return []
-    return (cmd : cmds)
+parseCommands = do
+  cmd <- parseCommand
+  cmds <- (parseToken (parseString ";") *> parseCommands) <|> return []
+  return (cmd : cmds)
 
 parseIdentifier :: Parser Identifier
 parseIdentifier = do

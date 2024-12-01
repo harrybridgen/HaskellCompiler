@@ -4,8 +4,30 @@ import Control.Applicative
 import Control.Monad
 import Data.Char
 import Data.List
+import Debug.Trace (trace)
 import Grammar
 import State
+
+reservedKeywords :: [String]
+reservedKeywords =
+  [ "let",
+    "in",
+    "var",
+    "fun",
+    "if",
+    "then",
+    "else",
+    "while",
+    "do",
+    "begin",
+    "end",
+    "true",
+    "false",
+    "Integer",
+    "Boolean",
+    "printint",
+    "getint"
+  ]
 
 type Error = String
 
@@ -24,7 +46,21 @@ checkProgram (LetIn decls cmd) = do
 checkDecls :: [Declaration] -> State VarContext [Error]
 checkDecls [] = return []
 checkDecls (FunDefine identifier args returnType body : decls) = do
+  varContext <- get
+  let argTypes = map snd args
+  let funType = FunType argTypes returnType
+
+  -- Add the function to the global context
+  if any ((== identifier) . fst) varContext
+    then return ["Function " ++ identifier ++ ": Identifier declared more than once"]
+    else do
+      put ((identifier, funType) : varContext)
+      return []
+
+  -- Check the function definition
   errors <- checkFunDefine identifier args returnType body
+
+  -- Continue with other declarations
   restErrors <- checkDecls decls
   return (errors ++ restErrors)
 checkDecls (VarDeclare identifier type1 : decls) = do
@@ -39,33 +75,51 @@ checkDecls (VarInitialize identifier type1 expr : decls) = do
 checkFunDefine :: Identifier -> [(Identifier, Type)] -> Type -> Expr -> State VarContext [Error]
 checkFunDefine identifier args returnType body = do
   varContext <- get
-  let duplicateError =
-        ["Function " ++ identifier ++ ": Identifier " ++ identifier ++ " declared more than once" | any ((== identifier) . fst) varContext]
-  let argTypes = map snd args
-  let funType = FunType argTypes returnType
-  put ((identifier, funType) : varContext)
-  let extendedVarContext = map (\(argName, argType) -> (argName, VarType argType)) args ++ ((identifier, funType) : varContext)
-  let bodyType = checkExpr extendedVarContext body
+
+  -- Build a context for the function arguments (local scope)
+  let argContext = map (\(argName, argType) -> (argName, VarType argType)) args
+
+  -- Check for reserved keywords
+  let reservedError =
+        ["Function " ++ identifier ++ ": Identifier cannot be a reserved keyword" | identifier `elem` reservedKeywords]
+
+  -- Check for duplicate argument declarations (only within function scope)
+  let duplicateArgError =
+        ["Function " ++ identifier ++ ": Argument names must be unique" | length (nub (map fst args)) /= length args]
+
+  -- Create a combined local context for the function (parameters + global)
+  let localContext = argContext ++ varContext
+
+  -- Type-check the function body
+  let bodyType = checkExpr localContext body
+
+  -- Check for type mismatches in the function body
   let bodyError =
         case bodyType of
           Right t | t /= returnType -> ["Function " ++ identifier ++ ": Body type does not match return type."]
           Left err -> ["Function " ++ identifier ++ ": " ++ err]
           _ -> []
-  return (duplicateError ++ bodyError)
+
+  -- Return all errors found
+  return (reservedError ++ duplicateArgError ++ bodyError)
 
 checkVarDeclare :: Identifier -> Type -> State VarContext [Error]
 checkVarDeclare identifier type1 = do
   varContext <- get
+  let reservedError =
+        ["Variable " ++ identifier ++ ": Identifier cannot be a reserved keyword" | identifier `elem` reservedKeywords]
   let duplicateError =
-        ["Variable " ++ identifier ++ ": Identifier " ++ identifier ++ " declared more than once" | any ((== identifier) . fst) varContext]
+        ["Variable " ++ identifier ++ ": Identifier declared more than once" | any ((== identifier) . fst) varContext]
   put ((identifier, VarType type1) : varContext)
-  return duplicateError
+  return (reservedError ++ duplicateError)
 
 checkVarInitialize :: Identifier -> Type -> Expr -> State VarContext [Error]
 checkVarInitialize identifier type1 expr = do
   varContext <- get
+  let reservedError =
+        ["Variable " ++ identifier ++ ": Identifier cannot be a reserved keyword" | identifier `elem` reservedKeywords]
   let duplicateError =
-        ["Variable " ++ identifier ++ ": Identifier " ++ identifier ++ " declared more than once" | any ((== identifier) . fst) varContext]
+        ["Variable " ++ identifier ++ ": Identifier declared more than once" | any ((== identifier) . fst) varContext]
   let exprType = checkExpr varContext expr
   let typeError =
         case exprType of
@@ -73,7 +127,7 @@ checkVarInitialize identifier type1 expr = do
           Left err -> ["Variable " ++ identifier ++ ": " ++ err]
           _ -> []
   put ((identifier, VarType type1) : varContext)
-  return (duplicateError ++ typeError)
+  return (reservedError ++ duplicateError ++ typeError)
 
 checkCommand :: Command -> State VarContext [Error]
 checkCommand (Assignment var expr) = do
@@ -154,9 +208,9 @@ checkExpr varContext (FunCall identifier args) = checkFunctionCall varContext id
 
 checkVariable :: VarContext -> Identifier -> Either Error Type
 checkVariable varContext var =
-  case lookup var varContext of
-    Just (VarType type1) -> Right type1
-    Just (FunType _ _) -> Left $ "Variable " ++ var ++ " is a function, not a variable."
+  case find ((== var) . fst) varContext of
+    Just (_, VarType type1) -> Right type1
+    Just (_, FunType _ _) -> Left $ "Variable " ++ var ++ " is a function, not a variable."
     Nothing -> Left $ "Variable " ++ var ++ " not declared."
 
 checkBinaryOp :: VarContext -> BinOperator -> Expr -> Expr -> Either Error Type
@@ -202,6 +256,7 @@ checkFunctionCall varContext identifier args =
       if length argTypes /= length args
         then Left $ "Function " ++ identifier ++ " called with incorrect number of arguments."
         else do
+          -- Check types of arguments
           argChecked <- mapM (checkExpr varContext) args
           if argChecked == argTypes
             then Right returnType

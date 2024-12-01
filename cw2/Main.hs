@@ -47,7 +47,7 @@ processTamFile sourceFile = do
       putStrLn "Executing TAM code"
       stack <- execTAM insts
       putStrLn $ "Final stack: " ++ show stack
-    _ -> putStrLn ("Error: Invalid TAM syntax " ++ show tamCode)
+    _ -> putStrLn "Syntax error"
 
 writeTamFile :: FilePath -> [TAMInst] -> IO ()
 writeTamFile sourceFile compiledCode = do
@@ -68,6 +68,7 @@ runMT sourceFile = do
           putStrLn ("No type errors found for " ++ sourceFile)
           stack <- execTAM compiledCode
           putStrLn $ "Final Stack: " ++ show stack
+    _ -> putStrLn "Syntax error"
 
 runTraceMT :: FilePath -> IO ()
 runTraceMT sourceFile = do
@@ -81,6 +82,7 @@ runTraceMT sourceFile = do
           putStrLn ("No type errors found for " ++ sourceFile)
           stack <- traceTAM compiledCode
           putStrLn $ "Final Stack: " ++ show stack
+    _ -> putStrLn "Syntax error"
 
 runTAM :: FilePath -> IO ()
 runTAM sourceFile = do
@@ -90,6 +92,7 @@ runTAM sourceFile = do
       putStrLn "Executing TAM code"
       stack <- execTAM tamCode
       putStrLn $ "Final stack: " ++ show stack
+    _ -> putStrLn "Syntax error"
 
 runTraceTAM :: FilePath -> IO ()
 runTraceTAM sourceFile = do
@@ -99,6 +102,7 @@ runTraceTAM sourceFile = do
       putStrLn "Executing TAM code"
       stack <- traceTAM tamCode
       putStrLn $ "Final stack: " ++ show stack
+    _ -> putStrLn "Syntax error"
 
 instsMT :: FilePath -> IO ()
 instsMT sourceFile = do
@@ -111,6 +115,7 @@ instsMT sourceFile = do
           putStrLn ("No type errors found for " ++ sourceFile)
           putStrLn "TAM instructions:"
           forM_ compiledCode (putStrLn . showInst)
+    _ -> putStrLn "Syntax error"
 
 parseSource :: FilePath -> IO Program
 parseSource sourceFile = do
@@ -128,3 +133,4 @@ parseSourceCheck sourceFile = do
       if null errors
         then putStrLn "No type errors found"
         else putStrLn $ unlines errors
+    _ -> putStrLn "Syntax error"

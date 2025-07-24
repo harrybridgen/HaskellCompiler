@@ -14,18 +14,16 @@ The project compiles MiniTriangle source files (`.mt`) to an intermediate assemb
 
 ## Project Structure
 
-The following components were entirely developed by me:
+The following components were developed by me:
 
--   **Parser** - A hand-written parser for MiniTriangle, including expression parsing with full precedence and associativity handling.
+-   **Parser** - A hand-written parser for MiniTriangle, including expression parsing with full precedence and associativity handling. Also contains necessary monads. 
 -   **TypeChecker** - Performs static semantic analysis with detailed error reporting.
 -   **Compiler** - Translates the MiniTriangle AST into TAM instructions.
 -   **TAM (Triangle Abstract Machine)** - A custom stack-based virtual machine that executes the compiled code.
 -   **State & StateIO** - Custom implementations of monadic state and state+IO threading.
 -   **Main** - Command-line entry point with support for both compiling and running `.mt` and `.tam` files.
 -   **Grammar** - Contains declarations for the grammar of the MiniTriangle language
--   **State** - Contains declaration and functions for the state monad
--   **StateIO** - Contains declaration and functions for the stateIO monad
-
+-   **/programs** - A folder containing many programs for the MiniTriangle language
 ---
 
 ## Usage

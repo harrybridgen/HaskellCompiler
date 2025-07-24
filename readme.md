@@ -22,7 +22,7 @@ The following components were entirely developed by me:
 -   **TAM (Triangle Abstract Machine)** - A custom stack-based virtual machine that executes the compiled code.
 -   **State & StateIO** - Custom implementations of monadic state and state+IO threading.
 -   **Main** - Command-line entry point with support for both compiling and running `.mt` and `.tam` files.
--   **Grammar - Contains declarations for the grammar of the MiniTriangle language
+-   **Grammar** - Contains declarations for the grammar of the MiniTriangle language
 -   **State** - Contains declaration and functions for the state monad
 -   **StateIO** - Contains declaration and functions for the stateIO monad
 
